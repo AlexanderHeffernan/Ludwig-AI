@@ -150,8 +150,10 @@ func RequestInput(prompt string) string {
 }
 
 func ClearScreen() {
+	/*
 	fmt.Print("\033[3J") // Clear scrollback (if supported)
     fmt.Print("\033[H\033[2J") // Home + clear visible screen
+	*/
 }
 
 func Println(text string) {

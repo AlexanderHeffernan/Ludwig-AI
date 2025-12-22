@@ -12,6 +12,7 @@ import (
 
 // Test sequential writes (simulating task operations)
 func TestTaskStorageSequentialWrites(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -37,6 +38,7 @@ func TestTaskStorageSequentialWrites(t *testing.T) {
 
 // Test concurrent reads
 func TestTaskStorageConcurrentReads(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -72,6 +74,7 @@ func TestTaskStorageConcurrentReads(t *testing.T) {
 
 // Test update with all fields
 func TestTaskStorageUpdateAllFields(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -114,6 +117,7 @@ func TestTaskStorageUpdateAllFields(t *testing.T) {
 
 // Test task with review request
 func TestTaskStorageWithReviewRequest(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -148,6 +152,7 @@ func TestTaskStorageWithReviewRequest(t *testing.T) {
 
 // Test task with review response
 func TestTaskStorageWithReviewResponse(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -176,6 +181,7 @@ func TestTaskStorageWithReviewResponse(t *testing.T) {
 
 // Test large number of tasks
 func TestTaskStorageLargeDataSet(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -210,6 +216,7 @@ func TestTaskStorageLargeDataSet(t *testing.T) {
 
 // Test that ListTasks returns all status types
 func TestTaskStorageListTasksMultipleStatus(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -246,6 +253,7 @@ func TestTaskStorageListTasksMultipleStatus(t *testing.T) {
 
 // Test task fields independence
 func TestTaskFieldsIndependence(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -282,6 +290,7 @@ func TestTaskFieldsIndependence(t *testing.T) {
 
 // Test storage path creation
 func TestTaskStoragePathHandling(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	home, _ := os.UserHomeDir()
@@ -303,6 +312,7 @@ func TestTaskStoragePathHandling(t *testing.T) {
 
 // Test storage with empty task list persistence
 func TestTaskStorageEmptyListPersistence(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s1, _ := storage.NewFileTaskStorage()
@@ -321,6 +331,7 @@ func TestTaskStorageEmptyListPersistence(t *testing.T) {
 
 // Test GetTask error message
 func TestTaskStorageGetTaskErrorMessage(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -336,6 +347,7 @@ func TestTaskStorageGetTaskErrorMessage(t *testing.T) {
 
 // Test multiple rapid operations
 func TestTaskStorageRapidOperations(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()

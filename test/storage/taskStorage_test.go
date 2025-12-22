@@ -44,6 +44,7 @@ func TestNewFileTaskStorageCreatesEmptyStorage(t *testing.T) {
 }
 
 func TestAddAndGetTask(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -72,6 +73,7 @@ func TestAddAndGetTask(t *testing.T) {
 }
 
 func TestGetTaskNotFound(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -83,6 +85,7 @@ func TestGetTaskNotFound(t *testing.T) {
 }
 
 func TestListTasks(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -110,6 +113,7 @@ func TestListTasks(t *testing.T) {
 }
 
 func TestUpdateTask(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -142,6 +146,7 @@ func TestUpdateTask(t *testing.T) {
 }
 
 func TestUpdateTaskNotFound(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -155,6 +160,7 @@ func TestUpdateTaskNotFound(t *testing.T) {
 }
 
 func TestDeleteTask(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -178,6 +184,7 @@ func TestDeleteTask(t *testing.T) {
 }
 
 func TestDeleteTaskNotFound(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -189,6 +196,7 @@ func TestDeleteTaskNotFound(t *testing.T) {
 }
 
 func TestTaskPersistence(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	// Create first storage instance and add task
@@ -213,6 +221,7 @@ func TestTaskPersistence(t *testing.T) {
 }
 
 func TestTaskJSONFormat(t *testing.T) {
+	setupTestStorage(t)
 	defer cleanupTestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()

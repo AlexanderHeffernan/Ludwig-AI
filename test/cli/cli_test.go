@@ -17,8 +17,14 @@ func cleanupCLITestStorage(t *testing.T) {
 	os.Remove(taskFile + ".lock")
 }
 
+// Test helper to setup (cleanup before) tests
+func setupCLITestStorage(t *testing.T) {
+	cleanupCLITestStorage(t)
+}
+
 // Test GetTasksAndDisplayKanban with no tasks
 func TestGetTasksAndDisplayKanbanEmpty(t *testing.T) {
+	setupCLITestStorage(t)
 	defer cleanupCLITestStorage(t)
 
 	_, _ = storage.NewFileTaskStorage()
@@ -36,6 +42,7 @@ func TestGetTasksAndDisplayKanbanEmpty(t *testing.T) {
 
 // Test GetTasksAndDisplayKanban with tasks
 func TestGetTasksAndDisplayKanbanWithTasks(t *testing.T) {
+	setupCLITestStorage(t)
 	defer cleanupCLITestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -88,6 +95,7 @@ func TestCLITaskStatusValues(t *testing.T) {
 
 // Test task filtering by status
 func TestTaskFilteringByStatus(t *testing.T) {
+	setupCLITestStorage(t)
 	defer cleanupCLITestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -139,6 +147,7 @@ func TestTaskFilteringByStatus(t *testing.T) {
 
 // Test task list with unequal status counts
 func TestTaskListUnbalancedStatuses(t *testing.T) {
+	setupCLITestStorage(t)
 	defer cleanupCLITestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()
@@ -198,6 +207,7 @@ func TestTaskListUnbalancedStatuses(t *testing.T) {
 
 // Test task retrieval for display
 func TestTaskRetrievalForDisplay(t *testing.T) {
+	setupCLITestStorage(t)
 	defer cleanupCLITestStorage(t)
 
 	s, _ := storage.NewFileTaskStorage()

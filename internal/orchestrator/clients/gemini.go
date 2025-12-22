@@ -8,7 +8,7 @@ import (
 type GeminiClient struct{}
 
 func (g *GeminiClient) SendPrompt(prompt string) (string, error) {
-	cmd := exec.Command("gemini", prompt)
+	cmd := exec.Command("gemini", "--yolo", prompt)
 	var out bytes.Buffer
 	var stderror bytes.Buffer
 	cmd.Stdout = &out

@@ -1,9 +1,11 @@
 package types
+
 import (
 	"fmt"
 )
 
-type Status int;
+type Status int
+
 const (
 	Pending Status = iota
 	InProgress
@@ -11,15 +13,16 @@ const (
 )
 
 type Task struct {
-	Name string
+	ID     string
+	Name   string
 	Status Status
 }
 
 func ExampleTasks() []Task {
 	return []Task{
-		{"Task 1", Pending},
-		{"Task 2", InProgress},
-		{"Task 3", Completed},
+		{"0", "Task 1", Pending},
+		{"1", "Task 2", InProgress},
+		{"2", "Task 3", Completed},
 	}
 }
 
@@ -41,4 +44,3 @@ func PrintTasks(tasks []Task) {
 		fmt.Println("Task: " + task.Name + ", Status: " + StatusString(task))
 	}
 }
-

@@ -1,7 +1,12 @@
 package main
 
-import "ludwig/internal/cli"
+import (
+	"ludwig/internal/orchestrator"
+	"time"
+)
 
 func main() {
-	cli.Execute()
+	orchestrator.Start()
+	time.Sleep(100 * time.Second)
+	orchestrator.Stop()
 }

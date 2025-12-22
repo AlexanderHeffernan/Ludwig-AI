@@ -116,6 +116,12 @@ func orchestratorLoop() {
 					}
 					defer respWriter.Close()
 					
+					// Store response file path immediately so it's available during streaming
+					t.ResponseFile = respPath
+					if err := taskStore.UpdateTask(t); err != nil {
+						log.Printf("Error saving task %s response file path: %v", t.ID, err)
+					}
+					
 					response, err := gemini.SendPrompt(prompt, respWriter)
 					if err != nil {
 						log.Printf("Error resuming task %s: %v", t.ID, err)
@@ -125,7 +131,7 @@ func orchestratorLoop() {
 					}
 					log.Printf("Completed task %s: Gemini response: %s", t.ID, response)
 					t.Status = types.Completed
-					t.ResponseFile = respPath
+					// ResponseFile already set above when streaming started
 					_ = taskStore.UpdateTask(t)
 					
 					// Checkout back to main after task completion
@@ -181,6 +187,12 @@ func orchestratorLoop() {
 					}
 					defer respWriter.Close()
 					
+					// Store response file path immediately so it's available during streaming
+					t.ResponseFile = respPath
+					if err := taskStore.UpdateTask(t); err != nil {
+						log.Printf("Error saving task %s response file path: %v", t.ID, err)
+					}
+					
 					response, err := gemini.SendPrompt(BuildTaskPrompt(t.Name), respWriter)
 					if err != nil {
 						log.Printf("Error sending task %s to Gemini: %v", t.ID, err)
@@ -196,7 +208,7 @@ func orchestratorLoop() {
 						t.Status = types.NeedsReview
 						t.WorkInProgress = workInProgress
 						t.Review = review
-						t.ResponseFile = respPath
+						// ResponseFile already set above when streaming started
 						_ = taskStore.UpdateTask(t)
 						processed = true
 						break
@@ -204,7 +216,7 @@ func orchestratorLoop() {
 
 					log.Printf("Completed task %s: Gemini response: %s", t.ID, response)
 					t.Status = types.Completed
-					t.ResponseFile = respPath
+					// ResponseFile already set above when streaming started
 					_ = taskStore.UpdateTask(t)
 					
 					// Checkout back to main after task completion

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"ludwig/internal/config"
 	"ludwig/internal/orchestrator/clients"
 	"ludwig/internal/storage"
 	"ludwig/internal/types"
@@ -60,7 +61,17 @@ func orchestratorLoop() {
 		log.Printf("Failed to initialize task storage: %v", err)
 		return
 	}
+	
+	// Load configuration (optional)
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Printf("Warning: Failed to load config: %v", err)
+	} else if cfg != nil {
+		log.Printf("Loaded config from ~/.ai-orchestrator/config.json")
+	}
+	
 	gemini := &clients.GeminiClient{}
+	var lastRequestTime time.Time
 
 	for {
 		select {
@@ -91,7 +102,27 @@ func orchestratorLoop() {
 						optionLabels[i] = opt.Label
 					}
 					prompt := BuildResumePrompt(t.Name, t.WorkInProgress, t.Review.Question, optionLabels, t.ReviewResponse.ChosenLabel, t.ReviewResponse.UserNotes)
-					response, err := gemini.SendPrompt(prompt)
+					
+					// Apply rate limiting before request
+					applyRateLimit(cfg, &lastRequestTime)
+					
+					// Create response writer for streaming
+					respWriter, respPath, err := storage.NewResponseWriter(t.ID)
+					if err != nil {
+						log.Printf("Error creating response writer for task %s: %v", t.ID, err)
+						t.Status = types.NeedsReview
+						_ = taskStore.UpdateTask(t)
+						continue
+					}
+					defer respWriter.Close()
+					
+					// Store response file path immediately so it's available during streaming
+					t.ResponseFile = respPath
+					if err := taskStore.UpdateTask(t); err != nil {
+						log.Printf("Error saving task %s response file path: %v", t.ID, err)
+					}
+					
+					response, err := gemini.SendPrompt(prompt, respWriter)
 					if err != nil {
 						log.Printf("Error resuming task %s: %v", t.ID, err)
 						t.Status = types.NeedsReview
@@ -100,6 +131,7 @@ func orchestratorLoop() {
 					}
 					log.Printf("Completed task %s: Gemini response: %s", t.ID, response)
 					t.Status = types.Completed
+					// ResponseFile already set above when streaming started
 					_ = taskStore.UpdateTask(t)
 					
 					// Checkout back to main after task completion
@@ -141,7 +173,27 @@ func orchestratorLoop() {
 						log.Printf("Failed to set task %s to In Progress: %v", t.ID, err)
 						continue
 					}
-					response, err := gemini.SendPrompt(BuildTaskPrompt(t.Name))
+					
+					// Apply rate limiting before request
+					applyRateLimit(cfg, &lastRequestTime)
+					
+					// Create response writer for streaming
+					respWriter, respPath, err := storage.NewResponseWriter(t.ID)
+					if err != nil {
+						log.Printf("Error creating response writer for task %s: %v", t.ID, err)
+						t.Status = types.Pending
+						_ = taskStore.UpdateTask(t)
+						continue
+					}
+					defer respWriter.Close()
+					
+					// Store response file path immediately so it's available during streaming
+					t.ResponseFile = respPath
+					if err := taskStore.UpdateTask(t); err != nil {
+						log.Printf("Error saving task %s response file path: %v", t.ID, err)
+					}
+					
+					response, err := gemini.SendPrompt(BuildTaskPrompt(t.Name), respWriter)
 					if err != nil {
 						log.Printf("Error sending task %s to Gemini: %v", t.ID, err)
 						t.Status = types.Pending
@@ -156,6 +208,7 @@ func orchestratorLoop() {
 						t.Status = types.NeedsReview
 						t.WorkInProgress = workInProgress
 						t.Review = review
+						// ResponseFile already set above when streaming started
 						_ = taskStore.UpdateTask(t)
 						processed = true
 						break
@@ -163,6 +216,7 @@ func orchestratorLoop() {
 
 					log.Printf("Completed task %s: Gemini response: %s", t.ID, response)
 					t.Status = types.Completed
+					// ResponseFile already set above when streaming started
 					_ = taskStore.UpdateTask(t)
 					
 					// Checkout back to main after task completion
@@ -330,4 +384,23 @@ func indexOf(s, sep string) int {
 		}
 	}
 	return -1
+}
+
+// applyRateLimit waits if necessary based on config rate limits
+func applyRateLimit(cfg *config.Config, lastRequestTime *time.Time) {
+	if cfg == nil || cfg.DelayMs <= 0 {
+		return // No rate limiting configured
+	}
+
+	now := time.Now()
+	timeSinceLastRequest := now.Sub(*lastRequestTime)
+	delay := time.Duration(cfg.DelayMs) * time.Millisecond
+
+	if timeSinceLastRequest < delay {
+		waitTime := delay - timeSinceLastRequest
+		log.Printf("Rate limiting: waiting %v before next request", waitTime)
+		time.Sleep(waitTime)
+	}
+
+	*lastRequestTime = time.Now()
 }

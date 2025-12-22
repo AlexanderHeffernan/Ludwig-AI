@@ -23,6 +23,7 @@ type Task struct {
 	WorkInProgress string          // Stores intermediate work before requesting review
 	Review         *ReviewRequest
 	ReviewResponse *ReviewResponse
+	ResponseFile   string          // Path to file containing AI response stream
 }
 
 type ReviewRequest struct {

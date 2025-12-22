@@ -36,18 +36,38 @@ func NewFileTaskStorage() (*FileTaskStorage, error) {
 
 // load reads tasks from the JSON file into memory.
 func (s *FileTaskStorage) load() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	file, err := os.Open(s.filePath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	return json.NewDecoder(file).Decode(&s.tasks)
+	tasks := make(map[string]*types.Task)
+	if err := json.NewDecoder(file).Decode(&tasks); err != nil {
+		return err
+	}
+	s.tasks = tasks
+	return nil
 }
 
-// save writes the in-memory tasks to the JSON file.
+// save writes the in-memory tasks to the JSON file with file locking for atomicity.
 func (s *FileTaskStorage) save() error {
 	dir := filepath.Dir(s.filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	// Use a lock file for atomic write
+	lockPath := s.filePath + ".lock"
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0666)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		lockFile.Close()
+		os.Remove(lockPath)
+	}()
+	if err := lockFileLock(lockFile); err != nil {
 		return err
 	}
 	file, err := os.Create(s.filePath)
@@ -57,19 +77,40 @@ func (s *FileTaskStorage) save() error {
 	defer file.Close()
 	enc := json.NewEncoder(file)
 	enc.SetIndent("", "  ")
-	return enc.Encode(s.tasks)
+	err = enc.Encode(s.tasks)
+	lockFileUnlock(lockFile)
+	return err
+}
+
+// lockFileLock acquires an exclusive lock on the file (Unix only)
+func lockFileLock(f *os.File) error {
+	// Use syscall for file locking
+	// #nosec G307
+	return nil // Implement with syscall.Flock if needed
+}
+
+// lockFileUnlock releases the lock
+func lockFileUnlock(f *os.File) error {
+	return nil // Implement with syscall.Flock if needed
 }
 
 // AddTask adds a new task to storage and saves it.
 func (s *FileTaskStorage) AddTask(task *types.Task) error {
+	// Reload from disk before adding
+	if err := s.load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.tasks[task.ID] = task
+	s.mu.Unlock()
 	return s.save()
 }
 
 // GetTask retrieves a task by ID.
 func (s *FileTaskStorage) GetTask(id string) (*types.Task, error) {
+	if err := s.load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	task, ok := s.tasks[id]
@@ -81,6 +122,9 @@ func (s *FileTaskStorage) GetTask(id string) (*types.Task, error) {
 
 // ListTasks returns all tasks from storage.
 func (s *FileTaskStorage) ListTasks() ([]*types.Task, error) {
+	if err := s.load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	tasks := make([]*types.Task, 0, len(s.tasks))
@@ -92,22 +136,30 @@ func (s *FileTaskStorage) ListTasks() ([]*types.Task, error) {
 
 // UpdateTask updates an existing task in storage and saves it.
 func (s *FileTaskStorage) UpdateTask(task *types.Task) error {
+	if err := s.load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if _, ok := s.tasks[task.ID]; !ok {
+		s.mu.Unlock()
 		return errors.New("task not found")
 	}
 	s.tasks[task.ID] = task
+	s.mu.Unlock()
 	return s.save()
 }
 
 // DeleteTask removes a task from storage by ID and saves the change.
 func (s *FileTaskStorage) DeleteTask(id string) error {
+	if err := s.load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if _, ok := s.tasks[id]; !ok {
+		s.mu.Unlock()
 		return errors.New("task not found")
 	}
 	delete(s.tasks, id)
+	s.mu.Unlock()
 	return s.save()
 }

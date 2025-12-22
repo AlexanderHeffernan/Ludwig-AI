@@ -28,8 +28,12 @@ func (g *GeminiClient) SendPrompt(prompt string) (string, error) {
 }
 
 // SendPromptWithStream sends a prompt and streams the response to the provided writer in real-time
+// Uses --output-format stream-json to get all intermediate thoughts and reasoning as they happen
 func (g *GeminiClient) SendPromptWithStream(prompt string, writer io.Writer) (string, error) {
-	cmd := exec.Command("gemini", "--yolo", prompt)
+	// Use --output-format stream-json for real-time event streaming
+	// This outputs each thought, message, and tool call as newline-delimited JSON
+	// allowing us to see the AI's complete reasoning process as it happens
+	cmd := exec.Command("gemini", "--yolo", "--output-format", "stream-json", prompt)
 	
 	// Create a pipe to read stdout in real-time
 	stdout, err := cmd.StdoutPipe()

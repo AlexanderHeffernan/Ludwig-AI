@@ -8,6 +8,7 @@ import (
 	"strings"
 	"ludwig/internal/orchestrator"
 	"strconv"
+	"os"
 )
 
 func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
@@ -29,8 +30,6 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 					fmt.Printf("Error adding new task: %v\n", err)
 					return
 				}
-				// Refresh the kanban display
-				GetTasksAndDisplayKanban(taskStore)
 			},
 			Description: "add <task description> - Add a new task. Tasks can be multiple words. No quotation marks needed.",
 		},
@@ -41,7 +40,6 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 				if !checkArgumentsCount(1, parts) { return }
 				utils.Println("Starting AI Orchestrator...")
 				orchestrator.Start()
-				utils.RequestAction(PalleteCommands(taskStore))
 			},
 			Description: "start - Start the AI Orchestrator",
 		},
@@ -55,7 +53,6 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 				}
 				utils.Println("Stopping AI Orchestrator...")
 				orchestrator.Stop()
-				utils.RequestAction(PalleteCommands(taskStore))
 			},
 			Description: "stop - Stop the AI Orchestrator",
 		},
@@ -65,8 +62,6 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 			Action: func(text string) {
 				parts := strings.Fields(text)
 				if !checkArgumentsCount(1, parts) { return }
-
-				GetTasksAndDisplayKanban(taskStore)
 			},
 		},
 		{
@@ -77,7 +72,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 				if !checkArgumentsCount(1, parts) { return }
 
 				utils.Println("Exiting CLI...")
-				return
+				os.Exit(0)
 			},
 		},
 	}

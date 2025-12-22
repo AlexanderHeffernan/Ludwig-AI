@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -19,11 +20,15 @@ type FileTaskStorage struct {
 
 // NewFileTaskStorage initializes storage and loads tasks from file.
 func NewFileTaskStorage() (*FileTaskStorage, error) {
-	home, err := os.UserHomeDir()
+	ludwigPath, err := getLudwigDirPath()
 	if err != nil {
 		return nil, err
 	}
-	path := filepath.Join(home, ".ai-orchestrator", "tasks.json")
+	if err := os.MkdirAll(ludwigPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create .ludwig directory: %w", err)
+	}
+
+	path := filepath.Join(ludwigPath, "tasks.json")
 	storage := &FileTaskStorage{
 		filePath: path,
 		tasks:    make(map[string]*types.Task),

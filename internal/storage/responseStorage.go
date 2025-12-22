@@ -8,6 +8,18 @@ import (
 	"time"
 )
 
+const ludwigDir = ".ludwig"
+
+// getLudwigDirPath returns the path to the .ludwig directory within the current working directory.
+func getLudwigDirPath() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current working directory: %w", err)
+	}
+	ludwigPath := filepath.Join(cwd, ludwigDir)
+	return ludwigPath, nil
+}
+
 // ResponseWriter streams AI responses to a file
 type ResponseWriter struct {
 	mu       sync.Mutex
@@ -19,15 +31,15 @@ type ResponseWriter struct {
 // NewResponseWriter creates a new response writer for a task
 // Returns the relative path to the response file for storage in tasks.json
 func NewResponseWriter(taskID string) (*ResponseWriter, string, error) {
-	home, err := os.UserHomeDir()
+	ludwigPath, err := getLudwigDirPath()
 	if err != nil {
 		return nil, "", err
 	}
 
 	// Create responses directory
-	responseDir := filepath.Join(home, ".ai-orchestrator", "responses")
+	responseDir := filepath.Join(ludwigPath, "responses")
 	if err := os.MkdirAll(responseDir, 0755); err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("failed to create .ludwig/responses directory: %w", err)
 	}
 
 	// Create filename with timestamp to ensure uniqueness
@@ -55,7 +67,7 @@ func NewResponseWriter(taskID string) (*ResponseWriter, string, error) {
 	}
 
 	// Return relative path for storage
-	relativePath := filepath.Join("responses", filename)
+	relativePath := filepath.Join("responses", filename) // This relative path is relative to .ludwig
 	return rw, relativePath, nil
 }
 
@@ -127,12 +139,12 @@ func (rw *ResponseWriter) GetFilePath() string {
 
 // ReadResponse reads the full response from file
 func ReadResponse(filePath string) (string, error) {
-	home, err := os.UserHomeDir()
+	ludwigPath, err := getLudwigDirPath()
 	if err != nil {
 		return "", err
 	}
 
-	fullPath := filepath.Join(home, ".ai-orchestrator", filePath)
+	fullPath := filepath.Join(ludwigPath, filePath)
 	content, err := os.ReadFile(fullPath)
 	if err != nil {
 		return "", err

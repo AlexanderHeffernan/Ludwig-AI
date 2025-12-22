@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	types "ludwig/internal/types"
+	"ludwig/internal/utils"
 )
 
 const (
@@ -26,17 +27,17 @@ func seperateTaskByStatus(tasks []types.Task) map[types.Status][]types.Task {
 
 const TASK_NAME_LENGTH = 30
 func printKanbanHeader() {
-	fmt.Println(" " + strings.Repeat("╭" + strings.Repeat("─", TASK_NAME_LENGTH) + "╮ ", 3))
-	fmt.Println(KanbanTaskName("Pending") + KanbanTaskName("In Progress") + KanbanTaskName("Completed"))
-	fmt.Println(" " + strings.Repeat("├" + strings.Repeat("─", TASK_NAME_LENGTH) + "┤ ", 3))
+	fmt.Print(" " + strings.Repeat("╭" + strings.Repeat("─", TASK_NAME_LENGTH) + "╮ ", 3) + "\r\n")
+	fmt.Print(KanbanTaskName("Pending") + KanbanTaskName("In Progress") + KanbanTaskName("Completed") + "\r\n")
+	fmt.Print(" " + strings.Repeat("├" + strings.Repeat("─", TASK_NAME_LENGTH) + "┤ ", 3) + "\r\n")
 }
 
 func printKanbanFooter() {
-	fmt.Println(" " + strings.Repeat("╰" + strings.Repeat("─", TASK_NAME_LENGTH) + "╯ ", 3))
+	fmt.Print(" " + strings.Repeat("╰" + strings.Repeat("─", TASK_NAME_LENGTH) + "╯ ", 3) + "\r\n")
 }
 func KanbanTaskName(name string) string {
 	if (len(name) + 5 > TASK_NAME_LENGTH) {
-		return " │ " + name[:15] + "... │ "
+		return " │ " + name[:15] + "... │"
 	}
 
 	numSpaces := TASK_NAME_LENGTH - len(name) - 1
@@ -45,6 +46,7 @@ func KanbanTaskName(name string) string {
 }
 
 func DisplayKanban(tasks []types.Task) {
+	utils.ClearScreen()
 	printKanbanHeader()
 	taskLists := seperateTaskByStatus(tasks)
 
@@ -63,13 +65,13 @@ func DisplayKanban(tasks []types.Task) {
 	for i := 0; i < maxListLength; i++ {
 		var line strings.Builder
 		for status := Pending; status <= Completed; status++ {
-			if i > len(taskLists[status]) {
+			if i >= len(taskLists[status]) {
 				line.WriteString(KanbanTaskName(""))
 				continue;
 			}
 			line.WriteString(KanbanTaskName(taskLists[status][i].Name))
 		}
-		fmt.Println(line.String())
+		fmt.Print(line.String() + " \r\n")
 	}
 	printKanbanFooter()
 }

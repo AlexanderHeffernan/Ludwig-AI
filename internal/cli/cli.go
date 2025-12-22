@@ -2,10 +2,8 @@ package cli
 
 import (
 	"fmt"
-	"ludwig/internal/types"
 	"ludwig/internal/utils"
 	"ludwig/internal/storage"
-	"github.com/google/uuid"
 )
 
 func GetTasksAndDisplayKanban(taskStore *storage.FileTaskStorage) {
@@ -16,28 +14,7 @@ func GetTasksAndDisplayKanban(taskStore *storage.FileTaskStorage) {
 	}
 	DisplayKanban(utils.PointerSliceToValueSlice(tasks))
 
-	utils.OnKeyPress([]utils.KeyAction{
-		{
-			Key: 'a',
-			Action: func() {
-				description := utils.RequestInput("Enter task description")
-
-				newTask := &types.Task{
-					Name: description,
-					Status: Pending,
-					ID: uuid.New().String(),
-				}
-				
-				if err := taskStore.AddTask(newTask); err != nil {
-					fmt.Printf("Error adding new task: %v\n", err)
-					return
-				}
-				//fmt.Printf("Added new task with ID: %s\n", newTask.ID)
-				GetTasksAndDisplayKanban(taskStore)
-			},
-			Description: "New Task",
-		},
-	})
+	utils.RequestAction(PalleteCommands(taskStore))
 } 
 
 func Execute() {

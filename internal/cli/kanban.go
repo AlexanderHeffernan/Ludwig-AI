@@ -27,20 +27,22 @@ func seperateTaskByStatus(tasks []types.Task) map[types.Status][]types.Task {
 
 const TASK_NAME_LENGTH = 30
 func printKanbanHeader() {
-	fmt.Print(" " + strings.Repeat("╭" + strings.Repeat("─", TASK_NAME_LENGTH) + "╮ ", 3) + "\r\n")
+	fmt.Print(" " + strings.Repeat("╭" + strings.Repeat("─", TASK_NAME_LENGTH - 3) + "╮ ", 3) + "\r\n")
 	fmt.Print(KanbanTaskName("Pending") + KanbanTaskName("In Progress") + KanbanTaskName("Completed") + "\r\n")
-	fmt.Print(" " + strings.Repeat("├" + strings.Repeat("─", TASK_NAME_LENGTH) + "┤ ", 3) + "\r\n")
+	fmt.Print(" " + strings.Repeat("├" + strings.Repeat("─", TASK_NAME_LENGTH - 3) + "┤ ", 3) + "\r\n")
 }
 
 func printKanbanFooter() {
-	fmt.Print(" " + strings.Repeat("╰" + strings.Repeat("─", TASK_NAME_LENGTH) + "╯ ", 3) + "\r\n")
+	fmt.Print(" " + strings.Repeat("╰" + strings.Repeat("─", TASK_NAME_LENGTH - 3) + "╯ ", 3) + "\r\n")
 }
 func KanbanTaskName(name string) string {
 	if (len(name) + 5 > TASK_NAME_LENGTH) {
-		return " │ " + name[:15] + "... │"
+		truncatedName := name[:TASK_NAME_LENGTH - 7] + "..."
+		numSpaces := TASK_NAME_LENGTH - len(truncatedName) - 4
+		return " │ " + truncatedName + strings.Repeat(" ", numSpaces) + "│"
 	}
 
-	numSpaces := TASK_NAME_LENGTH - len(name) - 1
+	numSpaces := TASK_NAME_LENGTH - len(name) - 4
 
 	return " │ " + name + strings.Repeat(" ", numSpaces) + "│"
 }

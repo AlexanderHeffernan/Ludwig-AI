@@ -13,19 +13,21 @@ func GetTasksAndDisplayKanban(taskStore *storage.FileTaskStorage) {
 		return
 	}
 	DisplayKanban(utils.PointerSliceToValueSlice(tasks))
-
-	utils.RequestAction(PalleteCommands(taskStore))
 } 
 
 func Execute() {
 	fmt.Println("Starting AI Orchestrator CLI...")
-	// Call orchestrator and mcp as needed
-	//var tasks = types.ExampleTasks()
 	taskStore, err := storage.NewFileTaskStorage()
 	if err != nil {
 		fmt.Printf("Error initializing task storage: %v\n", err)
 		return
 	}
-	GetTasksAndDisplayKanban(taskStore)
 
+	for {
+		GetTasksAndDisplayKanban(taskStore)
+		result := utils.RequestAction(PalleteCommands(taskStore))
+		if result == "exit" {
+			break
+		}
+	}
 }

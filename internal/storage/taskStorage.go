@@ -1,24 +1,15 @@
+package storage
 
+import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 
 	"ludwig/internal/types"
 )
-
-const ludwigDir = ".ludwig"
-
-// getLudwigDirPath returns the path to the .ludwig directory within the current working directory.
-func getLudwigDirPath() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get current working directory: %w", err)
-	}
-	ludwigPath := filepath.Join(cwd, ludwigDir)
-	return ludwigPath, nil
-}
 
 type FileTaskStorage struct {
 	mu       sync.Mutex
@@ -47,7 +38,6 @@ func NewFileTaskStorage() (*FileTaskStorage, error) {
 	}
 	return storage, nil
 }
-
 
 // load reads tasks from the JSON file into memory.
 func (s *FileTaskStorage) load() error {

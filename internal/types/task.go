@@ -19,6 +19,7 @@ type Task struct {
 	Name   string
 	Status Status
 
+	BranchName     string          // Git branch created for this task
 	WorkInProgress string          // Stores intermediate work before requesting review
 	Review         *ReviewRequest
 	ReviewResponse *ReviewResponse

@@ -101,6 +101,14 @@ func orchestratorLoop() {
 					log.Printf("Completed task %s: Gemini response: %s", t.ID, response)
 					t.Status = types.Completed
 					_ = taskStore.UpdateTask(t)
+					
+					// Checkout back to main after task completion
+					if err := CheckoutBranch("main"); err != nil {
+						log.Printf("Warning: Failed to checkout main after task %s completion: %v", t.ID, err)
+					} else {
+						log.Printf("Checked out to main after completing task %s", t.ID)
+					}
+					
 					processed = true
 					break
 				}
@@ -114,6 +122,20 @@ func orchestratorLoop() {
 			for _, t := range tasks {
 				if t.Status == types.Pending {
 					log.Printf("Starting task %s: %s", t.ID, t.Name)
+					
+					// Generate and create branch for this task
+					branchName, err := GenerateBranchName(t.Name)
+					if err != nil {
+						log.Printf("Failed to generate branch name for task %s: %v", t.ID, err)
+						continue
+					}
+					if err := CreateBranch(branchName); err != nil {
+						log.Printf("Failed to create branch %s for task %s: %v", branchName, t.ID, err)
+						continue
+					}
+					log.Printf("Created branch %s for task %s", branchName, t.ID)
+					t.BranchName = branchName
+					
 					t.Status = types.InProgress
 					if err := taskStore.UpdateTask(t); err != nil {
 						log.Printf("Failed to set task %s to In Progress: %v", t.ID, err)
@@ -142,6 +164,14 @@ func orchestratorLoop() {
 					log.Printf("Completed task %s: Gemini response: %s", t.ID, response)
 					t.Status = types.Completed
 					_ = taskStore.UpdateTask(t)
+					
+					// Checkout back to main after task completion
+					if err := CheckoutBranch("main"); err != nil {
+						log.Printf("Warning: Failed to checkout main after task %s completion: %v", t.ID, err)
+					} else {
+						log.Printf("Checked out to main after completing task %s", t.ID)
+					}
+					
 					processed = true
 					break // Only process one task per loop
 				}

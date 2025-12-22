@@ -11,12 +11,49 @@ import (
 
 type GeminiClient struct{}
 
-// SendPrompt sends a prompt to Gemini with streaming, retries on rate limits, and returns the response
+// modelFallbackChain defines the order in which models are tried
+var modelFallbackChain = []string{
+	"auto-gemini-3",
+	"gemini-2.5-pro",
+	"gemini-2.5-flash",
+	"gemini-2.5-flash-lite",
+}
+
+// SendPrompt sends a prompt to Gemini with streaming, retries on rate limits, and model fallback.
+// - Tries models in order: auto-gemini-3, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+// - For each model, retries up to 3 times on rate limit (429) errors with exponential backoff
 // - Streams output in real-time to the provided writer
-// - Automatically retries with exponential backoff on rate limit (429) errors
-// - On retry, includes partial work from previous attempt so AI can catch up and continue
+// - On failure (non-rate-limit), falls back to the next weaker model
 // - Returns the complete response text once done
 func (g *GeminiClient) SendPrompt(prompt string, writer io.Writer) (string, error) {
+	for _, model := range modelFallbackChain {
+		response, err := g.SendPromptWithModel(prompt, writer, model)
+		
+		// If successful, return
+		if err == nil {
+			return response, nil
+		}
+		
+		// If it's a rate limit error, don't fall back - return immediately
+		if isRateLimitError(response, err) {
+			return response, err
+		}
+		
+		// Non-rate-limit error: try next model
+		msg := fmt.Sprintf("\n\n⚠️  Model %s failed: %v. Falling back to next model...\n\n", model, err)
+		if writer != nil {
+			writer.Write([]byte(msg))
+		}
+	}
+	
+	return "", fmt.Errorf("all models exhausted")
+}
+
+// SendPromptWithModel sends a prompt to Gemini using a specific model with rate limit retries
+// - Retries up to 3 times on rate limit (429) errors with exponential backoff
+// - Includes partial work from previous attempt so AI can catch up and continue
+// - Returns the complete response text once done
+func (g *GeminiClient) SendPromptWithModel(prompt string, writer io.Writer, model string) (string, error) {
 	maxRetries := 3
 	baseDelay := 30 * time.Second
 	var lastPartialResponse string
@@ -28,7 +65,7 @@ func (g *GeminiClient) SendPrompt(prompt string, writer io.Writer) (string, erro
 			promptToUse = buildRetryPrompt(prompt, lastPartialResponse)
 		}
 
-		response, err := g.executeStream(promptToUse, writer)
+		response, err := g.executeStream(promptToUse, writer, model)
 
 		// Check for rate limit error (429)
 		if isRateLimitError(response, err) {
@@ -53,10 +90,10 @@ func (g *GeminiClient) SendPrompt(prompt string, writer io.Writer) (string, erro
 	return "", fmt.Errorf("max retries exceeded")
 }
 
-// executeStream executes a single streaming request to Gemini
-func (g *GeminiClient) executeStream(prompt string, writer io.Writer) (string, error) {
+// executeStream executes a single streaming request to Gemini using a specific model
+func (g *GeminiClient) executeStream(prompt string, writer io.Writer, model string) (string, error) {
 	// Use --output-format stream-json for real-time event streaming
-	cmd := exec.Command("gemini", "--yolo", "--output-format", "stream-json", prompt)
+	cmd := exec.Command("gemini", "--yolo", "--model", model, "--output-format", "stream-json", prompt)
 
 	// Create a pipe to read stdout in real-time
 	stdout, err := cmd.StdoutPipe()

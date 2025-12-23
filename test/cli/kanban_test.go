@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"ludwig/internal/cli"
+	"ludwig/internal/types"
 )
 
 func TestKanbanTaskNameNormal(t *testing.T) {
 	name := "User Login"
-	result := cli.KanbanTaskName(name)
+	result := cli.KanbanTaskName(name, types.Pending)
 
 	if !strings.Contains(result, name) {
 		t.Errorf("expected result to contain task name %q, got %q", name, result)
@@ -21,7 +22,7 @@ func TestKanbanTaskNameNormal(t *testing.T) {
 }
 
 func TestKanbanTaskNameEmpty(t *testing.T) {
-	result := cli.KanbanTaskName("")
+	result := cli.KanbanTaskName("", types.Pending)
 
 	// Should still produce a valid kanban cell
 	if !strings.Contains(result, "│") {
@@ -31,7 +32,7 @@ func TestKanbanTaskNameEmpty(t *testing.T) {
 
 func TestKanbanTaskNameTruncation(t *testing.T) {
 	longName := "This is an extremely long task name that definitely should be truncated"
-	result := cli.KanbanTaskName(longName)
+	result := cli.KanbanTaskName(longName, types.Pending)
 
 	// Should contain truncation indicator
 	if !strings.Contains(result, "...") {
@@ -50,7 +51,7 @@ func TestKanbanTaskNameTruncation(t *testing.T) {
 func TestKanbanTaskNameBoundary(t *testing.T) {
 	// Test with name exactly at boundary
 	name := "Task1234567890123456"
-	result := cli.KanbanTaskName(name)
+	result := cli.KanbanTaskName(name, types.Pending)
 
 	if !strings.Contains(result, "│") {
 		t.Errorf("expected kanban cell format")
@@ -59,7 +60,7 @@ func TestKanbanTaskNameBoundary(t *testing.T) {
 
 func TestKanbanTaskNameSpecialChars(t *testing.T) {
 	name := "Task: Feature #123"
-	result := cli.KanbanTaskName(name)
+	result := cli.KanbanTaskName(name, types.Pending)
 
 	if !strings.Contains(result, "│") {
 		t.Errorf("expected kanban cell format with special chars")
@@ -72,9 +73,26 @@ func TestKanbanTaskNameSpecialChars(t *testing.T) {
 
 func TestKanbanTaskNameUnicode(t *testing.T) {
 	name := "Task 📝"
-	result := cli.KanbanTaskName(name)
+	result := cli.KanbanTaskName(name, types.Pending)
 
 	if !strings.Contains(result, "│") {
 		t.Errorf("expected kanban cell format with unicode")
+	}
+}
+
+func TestKanbanTaskNameWithDifferentStatuses(t *testing.T) {
+	name := "Test Task"
+	statuses := []types.Status{types.Pending, types.InProgress, types.NeedsReview, types.Completed}
+
+	for _, status := range statuses {
+		result := cli.KanbanTaskName(name, status)
+
+		if !strings.Contains(result, name) {
+			t.Errorf("expected result to contain task name %q for status %d, got %q", name, status, result)
+		}
+
+		if !strings.Contains(result, "│") {
+			t.Errorf("expected result to have kanban border character for status %d", status)
+		}
 	}
 }

@@ -45,15 +45,7 @@ func genKanbanFooter() string {
 }
 
 func KanbanTaskName(name string) string {
-	if (len(name) + 5 > TASK_NAME_LENGTH) {
-		truncatedName := name[:TASK_NAME_LENGTH - 7] + "..."
-		numSpaces := TASK_NAME_LENGTH - len(truncatedName) - 4
-		return " │ " + truncatedName + strings.Repeat(" ", numSpaces) + "│"
-	}
-
-	numSpaces := TASK_NAME_LENGTH - len(name) - 4
-
-	return " │ " + name + strings.Repeat(" ", numSpaces) + "│"
+	return utils.LeftRightBorderedString(name, TASK_NAME_LENGTH, len(name), true)
 }
 
 func DisplayKanban(tasks []types.Task) {

@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -10,8 +11,10 @@ import (
 	"ludwig/internal/types"
 	"ludwig/internal/utils"
 
-	"github.com/charmbracelet/bubbles/textinput"
+	//"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/bubbles/textarea"
 )
 
 // StartInteractive runs the interactive bubbletea UI.
@@ -35,7 +38,7 @@ func StartInteractive() {
 type Model struct {
 	taskStore *storage.FileTaskStorage
 	tasks     []types.Task
-	textInput textinput.Model
+	textInput textarea.Model
 	commands  []utils.Command
 	err       error
 	message   string
@@ -44,11 +47,25 @@ type Model struct {
 // tickMsg is a message sent on a timer to trigger a refresh.
 type tickMsg time.Time
 
+// stripAnsiCodes removes ANSI escape sequences from a string to get the visible length
+func stripAnsiCodes(s string) string {
+	// Remove ANSI escape sequences (cursor movement, colors, etc.)
+	ansiRegex := `\x1b\[[0-9;]*[a-zA-Z]`
+	re := regexp.MustCompile(ansiRegex)
+	return re.ReplaceAllString(s, "")
+}
+
 // NewModel creates a new model with initial values.
 func NewModel(taskStore *storage.FileTaskStorage) *Model {
-	ti := textinput.New()
+	ti := textarea.New()
 	ti.Placeholder = "...Enter command (e.g., 'add <task>', 'exit', 'help')"
-	ti.Width = 50
+	ti.SetWidth(utils.TermWidth() - 6) // Account for border padding
+	ti.SetHeight(2) // Start with minimum height
+	ti.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	ti.BlurredStyle.CursorLine = lipgloss.NewStyle()
+	ti.ShowLineNumbers = false
+	ti.Prompt = ""
+	ti.CharLimit = 0 // No character limit
 	ti.Focus()
 
 	tasks, err := taskStore.ListTasks()
@@ -77,8 +94,49 @@ func (m *Model) Init() tea.Cmd {
 // Update handles incoming messages and updates the model.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	//m.textInput, cmd = m.textInput.Update(msg)
+
+	m.textInput, cmd = m.textInput.Update(msg)
+	// Dynamically adjust height based on content wrapping
+	content := m.textInput.Value()
+	if content == "" {
+		m.textInput.SetHeight(2)
+	} else {
+		// Calculate wrapped lines based on textarea width
+		width := m.textInput.Width()
+		if width <= 0 {
+			width = utils.TermWidth() - 6
+		}
+		wrappedLines := 1
+		currentLineLength := 0
+		
+		for _, char := range content {
+			if char == '\n' {
+				wrappedLines++
+				currentLineLength = 0
+			} else {
+				currentLineLength++
+				if currentLineLength >= width {
+					wrappedLines++
+					currentLineLength = 0
+				}
+			}
+		}
+		
+		if wrappedLines < 1 {
+			wrappedLines = 1
+		}
+		m.textInput.SetHeight(wrappedLines + 1)
+	}
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		// Handle terminal resize
+		termWidth := msg.Width
+		inputWidth := max(termWidth - 6, 20) // Account for border + padding
+
+		m.textInput.SetWidth(inputWidth)
+		return m, nil
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
@@ -138,7 +196,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	m.textInput, cmd = m.textInput.Update(msg)
 	return m, cmd
 }
 
@@ -158,28 +215,24 @@ func (m *Model) View() string {
 	
 	// Render the text input for commands with bubble border.
 	termWidth := utils.TermWidth()
-	s.WriteString(utils.GenerateTopBubbleBorder(termWidth))
 	
-	// Calculate padding for the input to fit within the bubble
-	inputWidth := termWidth - 6 // Account for borders and padding
-
-	inputWidth = max(inputWidth, 20)
-
-	
-	// Set the textinput width to fit within the bubble
-	m.textInput.Width = inputWidth
+	// Update textarea width to match the available space in the border
+	inputWidth := termWidth - 6 // Account for border (4) + padding (2)
+	if inputWidth < 20 {
+		inputWidth = 20 // Minimum width
+	}
+	m.textInput.SetWidth(inputWidth)
 	
 	// Render the middle of the bubble with the input
-	inputLine := " │ " + m.textInput.View()
-	// Pad the line to fill the bubble width
-	neededPadding := termWidth - len(inputLine) - 1
-	if neededPadding > 0 {
-		inputLine += strings.Repeat(" ", neededPadding)
-	}
-	inputLine += "│ \n"
-	s.WriteString(inputLine)
-	
-	s.WriteString(utils.GenerateBottomBubbleBorder(termWidth))
+	inputText := m.textInput.View()
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		Width(termWidth - 4).
+		BorderForeground(lipgloss.Color("62")).
+		Padding(0, 1).
+		Margin(1, 1)
+
+	s.WriteString(borderStyle.Render(inputText))
 	
 	return s.String()
 }

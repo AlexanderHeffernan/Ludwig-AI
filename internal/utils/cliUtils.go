@@ -178,3 +178,33 @@ func TermWidth() int {
 	}
 	return width
 }
+
+func LeftRightBorderedString(name string, length int, visLength int, truncate bool) string {
+	if (truncate && len(name) + 5 > length) {
+		truncatedName := name[:length - 4] + "..."
+		numSpaces := max(length - visLength - 4, 0)
+		return " │ " + truncatedName + strings.Repeat(" ", numSpaces) + "│"
+	}
+
+	numSpaces := max(length - visLength - 4, 0)
+
+	return " │ " + name + strings.Repeat(" ", numSpaces) + "│"
+}
+
+func InsertLineBreaks(s string, n int) string {
+if n <= 0 || len(s) == 0 {
+        return s
+    }
+    var b strings.Builder
+    for i := 0; i < len(s); i += n {
+        end := i + n
+        if end > len(s) {
+            end = len(s)
+        }
+        if i > 0 {
+            b.WriteByte('\n')
+        }
+        b.WriteString(s[i:end])
+    }
+    return b.String()
+}

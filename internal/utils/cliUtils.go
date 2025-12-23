@@ -66,7 +66,7 @@ func RequestAction(actions []Command) string {
 func PrintHelp(actions []Command) string {
 	builder := strings.Builder{}
 	//fmt.Println("Available Commands:")
-	builder.WriteString("Available Commands:\n  ")
+	builder.WriteString("\n  Available Commands:\n  ")
 	maxLength := 0
 	for _, cmd := range actions {
 		if len(cmd.Text) > maxLength {
@@ -179,7 +179,7 @@ func TermWidth() int {
 	return width
 }
 
-func LeftRightBorderedString(name string, length int, visLength int, truncate bool) string {
+func LeftRightBorderedString(name string, length int, visLength int, truncate bool, borderColor string) string {
 	if (truncate && len(name) + 5 > length) {
 		truncatedName := name[:length - 4] + "..."
 		numSpaces := max(length - visLength - 4, 0)
@@ -188,23 +188,24 @@ func LeftRightBorderedString(name string, length int, visLength int, truncate bo
 
 	numSpaces := max(length - visLength - 4, 0)
 
-	return " │ " + name + strings.Repeat(" ", numSpaces) + "│"
+	return ColoredString(" │ ", borderColor) + name + strings.Repeat(" ", numSpaces) + ColoredString("│", borderColor)
 }
 
 func InsertLineBreaks(s string, n int) string {
-if n <= 0 || len(s) == 0 {
+	if n <= 0 || len(s) == 0 {
         return s
     }
     var b strings.Builder
     for i := 0; i < len(s); i += n {
-        end := i + n
-        if end > len(s) {
-            end = len(s)
-        }
+        end := min(i + n, len(s))
         if i > 0 {
             b.WriteByte('\n')
         }
         b.WriteString(s[i:end])
     }
     return b.String()
+}
+
+func ColoredString(s string, colorCode string) string {
+	return fmt.Sprintf("\033[%sm%s\033[0m", colorCode, s)
 }

@@ -9,6 +9,7 @@ import (
 	"ludwig/internal/orchestrator"
 	"strconv"
 	"os"
+	"time"
 )
 
 func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
@@ -26,6 +27,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 					Name: strings.Join(parts[1:], " "),
 					Status: types.Pending,
 					ID: uuid.New().String(),
+					CreatedAt: time.Now(),
 				}
 
 				if err := taskStore.AddTask(newTask); err != nil {

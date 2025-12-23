@@ -18,6 +18,7 @@ type Task struct {
 	ID     string
 	Name   string
 	Status Status
+	CreatedAt   time.Time
 
 	BranchName     string          // Git branch created for this task
 	WorkInProgress string          // Stores intermediate work before requesting review

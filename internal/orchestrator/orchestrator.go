@@ -1,7 +1,6 @@
 package orchestrator
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -58,16 +57,14 @@ func orchestratorLoop() {
 	defer wg.Done()
 	taskStore, err := storage.NewFileTaskStorage()
 	if err != nil {
-		log.Printf("Failed to initialize task storage: %v", err)
+		// Silent failure - orchestrator runs in background
 		return
 	}
-
+	
 	// Load configuration (optional)
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Printf("Warning: Failed to load config: %v", err)
-	} else if cfg != nil {
-		log.Printf("Loaded config from ~/.ai-orchestrator/config.json")
+		// Config load failure is non-critical, continue without it
 	}
 
 	gemini := &clients.GeminiClient{}
@@ -81,7 +78,6 @@ func orchestratorLoop() {
 			// Process tasks in order: NeedsReview (with responses), then Pending
 			tasks, err := taskStore.ListTasks()
 			if err != nil {
-				log.Printf("Failed to list tasks: %v", err)
 				time.Sleep(2 * time.Second)
 				continue
 			}
@@ -90,10 +86,8 @@ func orchestratorLoop() {
 			// Check for NeedsReview tasks with responses
 			for _, t := range tasks {
 				if t.Status == types.NeedsReview && t.ReviewResponse != nil {
-					log.Printf("Resuming task %s with user response: %s", t.ID, t.ReviewResponse.ChosenLabel)
 					t.Status = types.InProgress
 					if err := taskStore.UpdateTask(t); err != nil {
-						log.Printf("Failed to set task %s to In Progress: %v", t.ID, err)
 						continue
 					}
 
@@ -109,7 +103,6 @@ func orchestratorLoop() {
 					// Create response writer for streaming
 					respWriter, respPath, err := storage.NewResponseWriter(t.ID)
 					if err != nil {
-						log.Printf("Error creating response writer for task %s: %v", t.ID, err)
 						t.Status = types.NeedsReview
 						_ = taskStore.UpdateTask(t)
 						continue
@@ -119,28 +112,22 @@ func orchestratorLoop() {
 					// Store response file path immediately so it's available during streaming
 					t.ResponseFile = respPath
 					if err := taskStore.UpdateTask(t); err != nil {
-						log.Printf("Error saving task %s response file path: %v", t.ID, err)
+						// Failure to save path is non-critical
 					}
 
-					response, err := gemini.SendPromptWithDir(prompt, respWriter, t.WorktreePath)
+					_, err = gemini.SendPromptWithDir(prompt, respWriter, t.WorktreePath)
 					if err != nil {
-						log.Printf("Error resuming task %s: %v", t.ID, err)
 						t.Status = types.NeedsReview
 						_ = taskStore.UpdateTask(t)
 						continue
 					}
-					log.Printf("Completed task %s: Gemini response: %s", t.ID, response)
 					t.Status = types.Completed
 					// ResponseFile already set above when streaming started
 					_ = taskStore.UpdateTask(t)
 
 					// Remove worktree after task completion
 					if t.WorktreePath != "" {
-						if err := RemoveWorktree(t.WorktreePath); err != nil {
-							log.Printf("Warning: Failed to remove worktree for task %s: %v", t.ID, err)
-						} else {
-							log.Printf("Removed worktree for task %s", t.ID)
-						}
+						_ = RemoveWorktree(t.WorktreePath)
 						t.WorktreePath = ""
 						_ = taskStore.UpdateTask(t)
 					}
@@ -157,27 +144,21 @@ func orchestratorLoop() {
 			// Process pending tasks
 			for _, t := range tasks {
 				if t.Status == types.Pending {
-					log.Printf("Starting task %s: %s", t.ID, t.Name)
-
 					// Generate and create worktree for this task
 					branchName, err := GenerateBranchName(t.Name)
 					if err != nil {
-						log.Printf("Failed to generate branch name for task %s: %v", t.ID, err)
 						continue
 					}
 
 					worktreePath, err := CreateWorktree(branchName, t.ID)
 					if err != nil {
-						log.Printf("Failed to create worktree for task %s: %v", t.ID, err)
 						continue
 					}
-					log.Printf("Created worktree at %s for task %s on branch %s", worktreePath, t.ID, branchName)
 					t.BranchName = branchName
 					t.WorktreePath = worktreePath
 
 					t.Status = types.InProgress
 					if err := taskStore.UpdateTask(t); err != nil {
-						log.Printf("Failed to set task %s to In Progress: %v", t.ID, err)
 						continue
 					}
 
@@ -187,7 +168,6 @@ func orchestratorLoop() {
 					// Create response writer for streaming
 					respWriter, respPath, err := storage.NewResponseWriter(t.ID)
 					if err != nil {
-						log.Printf("Error creating response writer for task %s: %v", t.ID, err)
 						t.Status = types.Pending
 						_ = taskStore.UpdateTask(t)
 						continue
@@ -197,12 +177,11 @@ func orchestratorLoop() {
 					// Store response file path immediately so it's available during streaming
 					t.ResponseFile = respPath
 					if err := taskStore.UpdateTask(t); err != nil {
-						log.Printf("Error saving task %s response file path: %v", t.ID, err)
+						// Failure to save path is non-critical
 					}
 
 					response, err := gemini.SendPromptWithDir(BuildTaskPrompt(t.Name), respWriter, t.WorktreePath)
 					if err != nil {
-						log.Printf("Error sending task %s to Gemini: %v", t.ID, err)
 						t.Status = types.Pending
 						_ = taskStore.UpdateTask(t)
 						continue
@@ -211,7 +190,6 @@ func orchestratorLoop() {
 					// Check if response contains a review request
 					workInProgress, review, hasReview := parseReviewRequest(response)
 					if hasReview {
-						log.Printf("Task %s needs review: %s", t.ID, review.Question)
 						t.Status = types.NeedsReview
 						t.WorkInProgress = workInProgress
 						t.Review = review
@@ -221,28 +199,22 @@ func orchestratorLoop() {
 						break
 					}
 
-					log.Printf("Completed task %s: Gemini response: %s", t.ID, response)
 					t.Status = types.Completed
 					// ResponseFile already set above when streaming started
 					_ = taskStore.UpdateTask(t)
 
 					// Remove worktree after task completion
 					if t.WorktreePath != "" {
-						if err := RemoveWorktree(t.WorktreePath); err != nil {
-							log.Printf("Warning: Failed to remove worktree for task %s: %v", t.ID, err)
-						} else {
-							log.Printf("Removed worktree for task %s", t.ID)
-						}
+						_ = RemoveWorktree(t.WorktreePath)
 						t.WorktreePath = ""
 						_ = taskStore.UpdateTask(t)
 					}
 
 					processed = true
 					break // Only process one task per loop
-				}
-			}
+					}
+					}
 			if !processed {
-				log.Printf("No pending tasks found. Waiting before polling again.")
 				time.Sleep(2 * time.Second) // No pending tasks, wait before polling again
 			}
 		}
@@ -407,7 +379,6 @@ func applyRateLimit(cfg *config.Config, lastRequestTime *time.Time) {
 
 	if timeSinceLastRequest < delay {
 		waitTime := delay - timeSinceLastRequest
-		log.Printf("Rate limiting: waiting %v before next request", waitTime)
 		time.Sleep(waitTime)
 	}
 

@@ -160,6 +160,7 @@ type Task struct {
     Name           string           // Task description
     Status         Status           // Current status
     BranchName     string           // Associated git branch
+    WorktreePath   string           // Path to git worktree directory
     WorkInProgress string           // Intermediate work progress
     Review         *ReviewRequest   // Design decision request
     ReviewResponse *ReviewResponse  // Human response to review
@@ -192,7 +193,7 @@ type Task struct {
 ```
 Pending Task
     ↓
-Create Git Branch
+Create Git Worktree
     ↓
 Send to AI (with SystemPrompt + Task)
     ↓
@@ -201,18 +202,20 @@ Does response contain ---NEEDS_REVIEW---?
     │   ↓
     │   Human provides decision
     │   ↓
-    │   Resume with user feedback
+    │   Resume with user feedback in Worktree
     │   ↓
-    │   Completed
-    └─ No: Completed immediately
+    │   Completed → Remove Worktree
+    └─ No: Completed → Remove Worktree
 ```
 
 ## Git Integration
 
-- Each task gets its own feature branch: `ludwig/<task-name>`
-- AI agents are instructed to make regular commits
-- Branches are checked out automatically for task processing
-- After task completion, orchestrator checks out back to `main`
+- Each task gets its own git worktree with an isolated branch: `ludwig/<task-name>`
+- Worktrees are stored in `.worktrees/<task-id>/` directory
+- AI agents work in their own worktree, allowing parallel task execution
+- User can continue working in the main branch while AI works on other tasks
+- After task completion, the worktree is automatically removed
+- This design allows multiple tasks to be processed simultaneously without blocking the user's workflow
 
 ## Testing Guidelines
 

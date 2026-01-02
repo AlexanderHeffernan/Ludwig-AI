@@ -4,18 +4,59 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
 
-// CreateBranch creates a new branch and checks it out
+// CreateWorktree creates a new git worktree for a given branch
+// Returns the path to the worktree directory
+func CreateWorktree(branchName, taskID string) (string, error) {
+	repoRoot := getRepoRoot()
+	worktreeDir := filepath.Join(repoRoot, ".worktrees", taskID)
+	
+	// Ensure .worktrees directory exists
+	if err := os.MkdirAll(filepath.Join(repoRoot, ".worktrees"), 0755); err != nil {
+		return "", fmt.Errorf("failed to create .worktrees directory: %w", err)
+	}
+	
+	// Create worktree with the branch
+	cmd := exec.Command("git", "worktree", "add", "-b", branchName, worktreeDir, "main")
+	cmd.Dir = repoRoot
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to create worktree: %w", err)
+	}
+	
+	return worktreeDir, nil
+}
+
+// RemoveWorktree removes a git worktree and cleans up the directory
+func RemoveWorktree(worktreePath string) error {
+	repoRoot := getRepoRoot()
+	
+	// Remove the worktree
+	cmd := exec.Command("git", "worktree", "remove", "-f", worktreePath)
+	cmd.Dir = repoRoot
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to remove worktree: %w", err)
+	}
+	
+	// Clean up any remaining files
+	if err := os.RemoveAll(worktreePath); err != nil {
+		return fmt.Errorf("failed to clean up worktree directory: %w", err)
+	}
+	
+	return nil
+}
+
+// CreateBranch creates a new branch and checks it out (deprecated: use CreateWorktree instead)
 func CreateBranch(branchName string) error {
 	cmd := exec.Command("git", "checkout", "-b", branchName)
 	cmd.Dir = getRepoRoot()
 	return cmd.Run()
 }
 
-// CheckoutBranch switches to an existing branch
+// CheckoutBranch switches to an existing branch (deprecated: no longer needed with worktrees)
 func CheckoutBranch(branchName string) error {
 	cmd := exec.Command("git", "checkout", branchName)
 	cmd.Dir = getRepoRoot()

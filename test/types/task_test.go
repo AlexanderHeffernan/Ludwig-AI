@@ -112,3 +112,20 @@ func TestReviewRequest(t *testing.T) {
 		t.Errorf("expected 2 options, got %d", len(req.Options))
 	}
 }
+
+func TestTaskWithWorktreePath(t *testing.T) {
+	task := types.Task{
+		ID:           "test-1",
+		Name:         "Test Task",
+		Status:       types.InProgress,
+		BranchName:   "ludwig/test-task",
+		WorktreePath: "/repo/.worktrees/test-1",
+	}
+
+	if task.WorktreePath != "/repo/.worktrees/test-1" {
+		t.Errorf("expected worktree path /repo/.worktrees/test-1, got %s", task.WorktreePath)
+	}
+	if task.BranchName != "ludwig/test-task" {
+		t.Errorf("expected branch name ludwig/test-task, got %s", task.BranchName)
+	}
+}

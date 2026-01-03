@@ -289,26 +289,27 @@ func matchesAsset(assetName, os, arch string) bool {
 		(strings.HasSuffix(assetName, ".tar.gz") || strings.HasSuffix(assetName, ".zip"))
 }
 
-// ApplyPendingUpdate checks if there's a pending .new binary and applies it
-func ApplyPendingUpdate() error {
+// ApplyPendingUpdate checks if there's a pending .new binary and applies it.
+// Returns true if an update was applied (requiring a restart).
+func ApplyPendingUpdate() (bool, error) {
 	exePath, err := os.Executable()
 	if err != nil {
-		return nil // Can't apply update if we can't determine executable path
+		return false, nil // Can't apply update if we can't determine executable path
 	}
 
 	newPath := exePath + ".new"
 
 	// Check if pending update exists
 	if _, err := os.Stat(newPath); os.IsNotExist(err) {
-		return nil // No pending update
+		return false, nil // No pending update
 	}
 
 	// Replace the old binary with the new one
 	if err := os.Rename(newPath, exePath); err != nil {
-		return fmt.Errorf("failed to apply pending update: %w", err)
+		return false, fmt.Errorf("failed to apply pending update: %w", err)
 	}
 
-	return nil
+	return true, nil
 }
 
 // compareVersions returns -1 if v1 < v2, 0 if equal, 1 if v1 > v2

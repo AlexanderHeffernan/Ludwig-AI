@@ -16,8 +16,13 @@ func main() {
 	flag.Parse()
 
 	// Apply any pending updates from previous run
-	if err := updater.ApplyPendingUpdate(); err != nil {
+	updated, err := updater.ApplyPendingUpdate()
+	if err != nil {
 		fmt.Println("Warning: " + err.Error())
+	}
+	if updated {
+		fmt.Println("Update applied! Please run the command again.")
+		return
 	}
 
 	if *versionFlag {

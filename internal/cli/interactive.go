@@ -10,12 +10,13 @@ import (
 	"ludwig/internal/storage"
 	"ludwig/internal/types"
 	"ludwig/internal/utils"
+	"ludwig/internal/orchestrator"
 
-	//"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/bubbles/spinner"
 	"bytes"
 )
 
@@ -28,7 +29,7 @@ func StartInteractive() {
 	}
 
 	m := NewModel(taskStore)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error running program: %v\n", err)
@@ -48,6 +49,7 @@ type Model struct {
 	filePath string
 	viewingViewport bool
 	viewingTask *types.Task
+	spinner spinner.Model
 }
 
 // tickMsg is a message sent on a timer to trigger a refresh.
@@ -88,15 +90,25 @@ func NewModel(taskStore *storage.FileTaskStorage) *Model {
 		err:       nil,
 	}
 	m.commands = PalleteCommands(taskStore)
+	m.spinner = spinner.New()
+	m.spinner.Spinner = spinner.Points
 	return m
 }
 
 
 // Init initializes the application with a command to start the timer.
 func (m *Model) Init() tea.Cmd {
-	return tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
-		return tickMsg(t)
-	})
+	/*
+return tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
+return tickMsg(t)
+})
+*/
+	return tea.Batch(
+		m.spinner.Tick, // This keeps the spinner animating (~10-15 FPS by default)
+		tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
+			return tickMsg(t)
+		}),
+		)
 }
 
 // Update handles incoming messages and updates the model.
@@ -117,7 +129,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		wrappedLines := 1
 		currentLineLength := 0
-		
+
 		for _, char := range content {
 			if char == '\n' {
 				wrappedLines++
@@ -130,7 +142,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		
+
 		if wrappedLines < 1 {
 			wrappedLines = 1
 		}
@@ -178,6 +190,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						output := cmd.Action(strings.Join(parts, " "))
 						if parts[0] == "view" {
 							m.viewport = viewport.New(utils.TermWidth() - 4, utils.TermHeight() - 6)
+							m.viewport.MouseWheelEnabled = true
+							m.viewport.MouseWheelDelta = 3
+							m.viewport.Style.Padding(0, 0)
+							m.viewport.Style.Margin(0, 0)
 							m.viewport.SetContent(output)
 							m.viewport.GotoBottom()
 							m.filePath = strings.SplitN(output, "\n", 2)[0]
@@ -223,6 +239,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
 			return tickMsg(t)
 		})
+	case spinner.TickMsg:  // ← ADD THIS
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
+	case tea.MouseMsg:
+		if m.viewingViewport {
+			var cmd tea.Cmd
+			m.viewport, cmd = m.viewport.Update(msg)
+			return m, cmd
+		}
+		return m, nil
 	case error:
 		m.err = msg
 		return m, nil
@@ -242,12 +269,22 @@ func (m *Model) View() string {
 			Width(utils.TermWidth() - 4).
 			Height(utils.TermHeight() - 8).
 			BorderForeground(lipgloss.Color("62")).
-			Padding(1, 1).
+			Padding(0, 1).
 			Margin(1, 1)
 
-		s.WriteString(bubbleStyle.Render(m.viewport.View()))
+		spinnerStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("62"))
+
+		spinnerOn := m.viewingTask.Status == types.InProgress && orchestrator.IsRunning()
+
+		builder := strings.Builder{}
+		builder.WriteString(bubbleStyle.Render(m.viewport.View() + "\n"))
+		if spinnerOn {
+			builder.WriteString(spinnerStyle.Render(m.spinner.View() + " Working on it"))
+		}
+
+		s.WriteString(builder.String())
 		s.WriteString(VIEWPORT_CONTROLS)
-		s.WriteString(utils.ThinkingString(*m.viewingTask))
 		return s.String()
 	}
 	// Render the Kanban board.
@@ -255,7 +292,7 @@ func (m *Model) View() string {
 	//s.WriteString("\n")
 
 	linesCount := strings.Count(s.String(), "\n")
-	
+
 	padStyle := lipgloss.NewStyle().
 		Padding(1, 2).
 		Height(utils.TermHeight() - linesCount - m.textInput.Height() - 3).
@@ -274,14 +311,14 @@ func (m *Model) View() string {
 		// Add empty padding to separate Kanban from input
 		s.WriteString(padStyle.Render(""))
 	}
-	
+
 	// Render the text input for commands with bubble border.
 	termWidth := utils.TermWidth()
-	
+
 	// Update textarea width to match the available space in the border
 	inputWidth := max(termWidth - 6, 20) // Account for border (4) + padding (2)
 	m.textInput.SetWidth(inputWidth)
-	
+
 	// Render the middle of the bubble with the input
 	inputText := m.textInput.View()
 	borderStyle := lipgloss.NewStyle().
@@ -292,7 +329,7 @@ func (m *Model) View() string {
 		Margin(1, 1)
 
 	s.WriteString(borderStyle.Render(inputText))
-	
+
 	return s.String()
 }
 

@@ -4,9 +4,7 @@ import (
 	"strings"
 	"encoding/json"
 	"time"
-	"ludwig/internal/orchestrator"
 	"ludwig/internal/types"
-	//tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"crypto/sha256"
 	"sync"
@@ -191,12 +189,16 @@ func OutputLines(lines []string) string {
 	return colouredOrderedLists(outputStr)
 }
 
-func ThinkingString(task types.Task) string {
-	if orchestrator.IsRunning() && task.Status == types.InProgress {
-		return " (thinking...)"
+/*
+func ThinkingString(m *cli.Model) string {
+	if true {
+	//if orchestrator.IsRunning() && task.Status == types.InProgress {
+		//return "thinking " + m.spinner.View() + " "
+		return ""
 	}
 	return ""
 }
+*/
 
 func GetTaskByPath(tasks []types.Task, path string) *types.Task {
 	// remove the './.ludwig/' prefix from path

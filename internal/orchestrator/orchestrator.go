@@ -184,8 +184,9 @@ func processResumeTask(taskStore *storage.FileTaskStorage, aiClient clients.AICl
 	// ResponseFile already set above when streaming started
 	_ = taskStore.UpdateTask(t)
 
-	// Remove worktree after task completion
+	// Commit any uncommitted work before removing worktree
 	if t.WorktreePath != "" {
+		_ = CommitAnyChanges(t.WorktreePath, t.ID)
 		_ = RemoveWorktree(t.WorktreePath)
 		t.WorktreePath = ""
 		_ = taskStore.UpdateTask(t)
@@ -255,8 +256,9 @@ func processNewTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClien
 	// ResponseFile already set above when streaming started
 	_ = taskStore.UpdateTask(t)
 
-	// Remove worktree after task completion
+	// Commit any uncommitted work before removing worktree
 	if t.WorktreePath != "" {
+		_ = CommitAnyChanges(t.WorktreePath, t.ID)
 		_ = RemoveWorktree(t.WorktreePath)
 		t.WorktreePath = ""
 		_ = taskStore.UpdateTask(t)

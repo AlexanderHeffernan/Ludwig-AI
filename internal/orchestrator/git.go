@@ -72,6 +72,42 @@ func RemoveWorktree(worktreePath string) error {
 	return nil
 }
 
+// CommitAnyChanges stages and commits any uncommitted changes in the worktree
+// This ensures that AI work is preserved even if the AI didn't explicitly commit
+// Uses the task ID to create a descriptive commit message
+func CommitAnyChanges(worktreePath string, taskID string) error {
+	// Check if there are any changes
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = worktreePath
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to check git status: %w", err)
+	}
+	
+	// If no changes, nothing to commit
+	if len(output) == 0 {
+		return nil
+	}
+	
+	// Stage all changes
+	addCmd := exec.Command("git", "add", "-A")
+	addCmd.Dir = worktreePath
+	if err := addCmd.Run(); err != nil {
+		return fmt.Errorf("failed to stage changes: %w", err)
+	}
+	
+	// Commit the changes
+	commitMsg := fmt.Sprintf("Task completed: %s\n\nAuto-committed any uncommitted changes to preserve work.", taskID)
+	commitCmd := exec.Command("git", "commit", "-m", commitMsg)
+	commitCmd.Dir = worktreePath
+	if err := commitCmd.Run(); err != nil {
+		// Commit might fail if there are no staged changes after add, which is fine
+		return nil
+	}
+	
+	return nil
+}
+
 // CreateBranch creates a new branch and checks it out (deprecated: use CreateWorktree instead)
 func CreateBranch(branchName string) error {
 	cmd := exec.Command("git", "checkout", "-b", branchName)

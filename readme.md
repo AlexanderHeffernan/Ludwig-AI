@@ -186,10 +186,10 @@ type Task struct {
 
 1. **Initialization**: Loads tasks from storage and creates task branches
 2. **Polling**: Checks for pending tasks and processes them in order
-3. **AI Processing**: Sends tasks to Gemini with system prompt and task description
+3. **AI Processing**: Sends tasks to AI client with system prompt and task description
 4. **Review Detection**: Parses responses for `---NEEDS_REVIEW---` markers
 5. **Review Handling**: If review needed, waits for human decision
-6. **Completion**: Marks tasks complete and checks out to main branch
+6. **Completion**: Marks tasks complete, auto-commits any uncommitted changes, and removes worktree
 
 ### Task Processing Flow
 
@@ -217,7 +217,10 @@ Does response contain ---NEEDS_REVIEW---?
 - Worktrees are stored in `.worktrees/<task-id>/` directory
 - AI agents work in their own worktree, allowing parallel task execution
 - User can continue working in the main branch while AI works on other tasks
-- After task completion, the worktree is automatically removed
+- After task completion:
+  - Any uncommitted changes are automatically staged and committed to preserve work
+  - Worktree is removed, leaving the task branch for user review
+  - User can then review the branch and decide to merge, rebase, or discard
 - This design allows multiple tasks to be processed simultaneously without blocking the user's workflow
 
 ## Testing Guidelines

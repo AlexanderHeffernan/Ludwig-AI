@@ -47,6 +47,7 @@ type Model struct {
 	viewport viewport.Model
 	filePath string
 	viewingViewport bool
+	viewingTask *types.Task
 }
 
 // tickMsg is a message sent on a timer to trigger a refresh.
@@ -178,7 +179,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						if parts[0] == "view" {
 							m.viewport = viewport.New(utils.TermWidth() - 4, utils.TermHeight() - 6)
 							m.viewport.SetContent(output)
+							m.viewport.GotoBottom()
 							m.filePath = strings.SplitN(output, "\n", 2)[0]
+							m.viewingTask = utils.GetTaskByPath(m.tasks, m.filePath)
+							utils.DebugLog(m.viewingTask.Name)
 							m.viewingViewport = true
 							m.ViewportUpdateLoop(utils.GetFileHash(m.filePath))
 						} else {
@@ -236,13 +240,14 @@ func (m *Model) View() string {
 		bubbleStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			Width(utils.TermWidth() - 4).
-			Height(utils.TermHeight() - 6).
+			Height(utils.TermHeight() - 8).
 			BorderForeground(lipgloss.Color("62")).
 			Padding(1, 1).
 			Margin(1, 1)
 
 		s.WriteString(bubbleStyle.Render(m.viewport.View()))
 		s.WriteString(VIEWPORT_CONTROLS)
+		s.WriteString(utils.ThinkingString(*m.viewingTask))
 		return s.String()
 	}
 	// Render the Kanban board.
@@ -302,6 +307,9 @@ func (m *Model) ViewportUpdateLoop(lastHash []byte)  {
 			return
 		}
 		m.viewport.SetContent(utils.OutputLines(strings.Split(fileContent, "\n")))
+		if m.viewport.ScrollPercent() > 0.95 {
+			m.viewport.GotoBottom()
+		}
 		m.ViewportUpdateLoop(currentHash)
 	})
 }

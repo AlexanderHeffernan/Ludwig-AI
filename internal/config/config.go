@@ -9,7 +9,11 @@ import (
 
 // Config represents the user's configuration
 type Config struct {
-	DelayMs int `json:"delayMs"` // Minimum delay in milliseconds between requests
+	DelayMs    int    `json:"delayMs"`    // Minimum delay in milliseconds between requests
+	AIProvider string `json:"aiProvider"` // "gemini" (default) or "ollama"
+	// Ollama-specific settings
+	OllamaBaseURL string `json:"ollamaBaseURL"` // Base URL for Ollama (default: http://localhost:11434)
+	OllamaModel   string `json:"ollamaModel"`   // Model name for Ollama (default: mistral)
 }
 
 // LoadConfig loads configuration from ~/.ai-orchestrator/config.json

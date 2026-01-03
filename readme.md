@@ -1,6 +1,6 @@
 # Ludwig: AI Task Orchestrator
 
-Ludwig is an AI-powered task orchestrator that automates project work through integrated AI clients (currently Gemini). It manages task execution, git workflows, and human review cycles through a command-line interface.
+Ludwig is an AI-powered task orchestrator that automates project work through integrated AI clients (Gemini or Ollama). It manages task execution, git workflows, and human review cycles through a command-line interface. Works online with Gemini or completely offline with Ollama.
 
 ## Project Structure
 
@@ -21,7 +21,9 @@ ludwig/
 │   │   ├── prompts.go                # System prompts for AI agents
 │   │   ├── git.go                    # Git operations
 │   │   └── clients/
-│   │       └── gemini.go             # Gemini AI client
+│   │       ├── aiclient.go           # AIClient interface
+│   │       ├── gemini.go             # Gemini AI client
+│   │       └── ollama.go             # Ollama AI client
 │   ├── storage/                      # Data persistence
 │   │   ├── taskStorage.go            # Task file storage
 │   │   ├── responseStorage.go        # AI response streaming
@@ -302,6 +304,72 @@ For detailed coverage information, see [TEST_COVERAGE_IMPROVEMENTS.md](./TEST_CO
 2. Update tests in `test/orchestrator/`
 3. Test with actual tasks to verify AI understanding
 
+## AI Provider Configuration
+
+Ludwig supports multiple AI providers for offline capability and flexibility:
+
+### Gemini (Default)
+
+Requires Google Gemini API access via the `gemini` CLI tool.
+
+```bash
+# Install gemini CLI (requires authentication with Google account)
+# See: https://github.com/google/generative-ai-cli
+
+# Gemini is the default provider, no configuration needed
+```
+
+### Ollama (Offline)
+
+Run completely offline using open-source models via Ollama.
+
+#### Setup
+
+1. **Install Ollama**: https://ollama.ai/
+
+2. **Start Ollama service**:
+   ```bash
+   ollama serve
+   ```
+
+3. **Download a model** (in another terminal):
+   ```bash
+   # Recommended models (in order of capability/speed):
+   ollama pull mistral          # Fast, general purpose (~4GB)
+   ollama pull neural-chat      # Good quality (~4GB)
+   ollama pull dolphin-mixtral  # High quality (~26GB)
+   ```
+
+4. **Configure Ludwig** to use Ollama:
+   ```bash
+   # Create/edit ~/.ai-orchestrator/config.json
+   {
+       "aiProvider": "ollama",
+       "ollamaBaseURL": "http://localhost:11434",
+       "ollamaModel": "mistral"
+   }
+   ```
+
+#### Configuration Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `aiProvider` | `"gemini"` or `"ollama"` | `"gemini"` |
+| `ollamaBaseURL` | Base URL of Ollama server | `http://localhost:11434` |
+| `ollamaModel` | Model name to use | `mistral` |
+| `delayMs` | Minimum delay between requests (optional) | - |
+
+#### Example Full Config
+
+```json
+{
+    "aiProvider": "ollama",
+    "ollamaBaseURL": "http://localhost:11434",
+    "ollamaModel": "mistral",
+    "delayMs": 1000
+}
+```
+
 ## Troubleshooting
 
 ### Tests Failing
@@ -319,9 +387,18 @@ For detailed coverage information, see [TEST_COVERAGE_IMPROVEMENTS.md](./TEST_CO
 
 ### Orchestrator Not Starting
 
+#### With Gemini
 1. Check if Gemini API key is set in environment
-2. Verify git repository is initialized: `git status`
-3. Check task storage is accessible: `ls ~/.ai-orchestrator/`
+2. Verify `gemini` CLI tool is installed and in PATH: `which gemini`
+3. Verify git repository is initialized: `git status`
+4. Check task storage is accessible: `ls ~/.ai-orchestrator/`
+
+#### With Ollama
+1. Verify Ollama is running: `curl http://localhost:11434/api/tags`
+2. Check that a model is installed: `ollama list`
+3. Verify config has `"aiProvider": "ollama"`
+4. Check config points to correct Ollama URL: `ollamaBaseURL`
+5. Verify git repository is initialized: `git status`
 
 ## Dependencies
 
@@ -348,10 +425,12 @@ MIT (adjust if needed)
 
 ## Next Steps / Future Enhancements
 
-- [ ] Support additional AI clients beyond Gemini
+- [x] Support additional AI clients (Gemini + Ollama)
+- [ ] Support additional AI clients (Claude, LLaMA, etc.)
 - [ ] Model Context Protocol (MCP) integration
 - [ ] Advanced task scheduling and prioritization
 - [ ] Web UI for task management
 - [ ] Webhook integration for automated task triggers
 - [ ] Task templates and presets
 - [ ] Performance metrics and analytics
+- [ ] Local embedding support for better context

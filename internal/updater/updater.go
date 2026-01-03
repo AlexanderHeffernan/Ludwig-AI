@@ -71,10 +71,20 @@ func CheckForUpdate(currentVersion string) (bool, string, error) {
 }
 
 // DownloadAndInstall downloads the latest release and replaces the current binary
-func DownloadAndInstall() error {
+func DownloadAndInstall(currentVersion string) error {
 	latestVersion, err := GetLatestVersion()
 	if err != nil {
 		return err
+	}
+
+	// Check if update is actually needed
+	isNewer, _, err := CheckForUpdate(currentVersion)
+	if err != nil {
+		return err
+	}
+	if !isNewer {
+		fmt.Println("Already on the latest version (" + currentVersion + ")")
+		return nil
 	}
 
 	// Get current executable path

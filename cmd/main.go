@@ -20,7 +20,7 @@ func main() {
 	}
 
 	if *updateFlag {
-		if err := updater.DownloadAndInstall(); err != nil {
+		if err := updater.DownloadAndInstall(version); err != nil {
 			fmt.Println("Error: " + err.Error())
 			return
 		}

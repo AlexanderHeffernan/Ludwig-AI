@@ -201,3 +201,33 @@ func TestGeminiClientAIClientInterface(t *testing.T) {
 		t.Errorf("AIClient should not be nil")
 	}
 }
+
+// TestCopilotClientNewWithDefaults tests that Copilot client is created with correct defaults
+func TestCopilotClientNewWithDefaults(t *testing.T) {
+	client := clients.NewCopilotClient("")
+	
+	if client.Model != "gpt-5" {
+		t.Errorf("expected default Model to be 'gpt-5', got '%s'", client.Model)
+	}
+}
+
+// TestCopilotClientNewWithCustomModel tests that Copilot client is created with custom model
+func TestCopilotClientNewWithCustomModel(t *testing.T) {
+	customModel := "claude-sonnet-4.5"
+	client := clients.NewCopilotClient(customModel)
+	
+	if client.Model != customModel {
+		t.Errorf("expected Model to be '%s', got '%s'", customModel, client.Model)
+	}
+}
+
+// TestCopilotClientAIClientInterface ensures CopilotClient implements AIClient interface
+func TestCopilotClientAIClientInterface(t *testing.T) {
+	client := clients.NewCopilotClient("")
+	var aiClient clients.AIClient = client
+	
+	// Verify the interface is properly implemented (can't execute without copilot CLI)
+	if aiClient == nil {
+		t.Errorf("AIClient should not be nil")
+	}
+}

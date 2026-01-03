@@ -11,10 +11,12 @@ import (
 // Config represents the user's configuration
 type Config struct {
 	DelayMs    int    `json:"delayMs"`    // Minimum delay in milliseconds between requests
-	AIProvider string `json:"aiProvider"` // "gemini" (default) or "ollama"
+	AIProvider string `json:"aiProvider"` // "gemini" (default), "ollama", or "copilot"
 	// Ollama-specific settings
 	OllamaBaseURL string `json:"ollamaBaseURL"` // Base URL for Ollama (default: http://localhost:11434)
 	OllamaModel   string `json:"ollamaModel"`   // Model name for Ollama (default: mistral)
+	// Copilot-specific settings
+	CopilotModel string `json:"copilotModel"` // Model name for Copilot (default: gpt-5)
 }
 
 // LoadConfig loads configuration from .ludwig/config.json in the current project

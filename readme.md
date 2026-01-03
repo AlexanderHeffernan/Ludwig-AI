@@ -1,6 +1,6 @@
 # Ludwig: AI Task Orchestrator
 
-Ludwig is an AI-powered task orchestrator that automates project work through integrated AI clients (Gemini or Ollama). It manages task execution, git workflows, and human review cycles through a command-line interface. Works online with Gemini or completely offline with Ollama.
+Ludwig is an AI-powered task orchestrator that automates project work through integrated AI clients (Gemini, Ollama, or GitHub Copilot CLI). It manages task execution, git workflows, and human review cycles through a command-line interface. Works online with Gemini/Copilot or completely offline with Ollama.
 
 ## Project Structure
 
@@ -23,7 +23,8 @@ ludwig/
 │   │   └── clients/
 │   │       ├── aiclient.go           # AIClient interface
 │   │       ├── gemini.go             # Gemini AI client
-│   │       └── ollama.go             # Ollama AI client
+│   │       ├── ollama.go             # Ollama AI client
+│   │       └── copilot.go            # GitHub Copilot CLI client
 │   ├── storage/                      # Data persistence
 │   │   ├── taskStorage.go            # Task file storage
 │   │   ├── responseStorage.go        # AI response streaming
@@ -319,6 +320,38 @@ Requires Google Gemini API access via the `gemini` CLI tool.
 # Gemini is the default provider, no configuration needed
 ```
 
+### GitHub Copilot CLI
+
+Use your GitHub Copilot subscription with free education credits.
+
+#### Setup
+
+1. **Install GitHub Copilot CLI**:
+   ```bash
+   # Via Homebrew (macOS/Linux)
+   brew install --cask github-copilot-cli
+   
+   # Or download from: https://github.com/github/gh-copilot
+   ```
+
+2. **Authenticate with GitHub**:
+   ```bash
+   copilot auth login
+   ```
+
+3. **Configure Ludwig** to use Copilot:
+   ```bash
+   # Edit or create .ludwig/config.json (in your project root)
+   {
+       "aiProvider": "copilot",
+       "copilotModel": "gpt-5"
+   }
+   ```
+
+   Supported models: `gpt-5`, `gpt-5-mini`, `claude-sonnet-4.5`, `claude-haiku-4.5`, `claude-opus-4.5`, etc.
+   
+   Note: Ludwig uses `copilot --model <model> -p <prompt> --allow-all-tools` for non-interactive automation.
+
 ### Ollama (Offline)
 
 Run completely offline using open-source models via Ollama.
@@ -354,9 +387,10 @@ Run completely offline using open-source models via Ollama.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `aiProvider` | `"gemini"` or `"ollama"` | `"gemini"` |
+| `aiProvider` | `"gemini"`, `"ollama"`, or `"copilot"` | `"gemini"` |
 | `ollamaBaseURL` | Base URL of Ollama server | `http://localhost:11434` |
-| `ollamaModel` | Model name to use | `mistral` |
+| `ollamaModel` | Model name to use with Ollama | `mistral` |
+| `copilotModel` | Model name to use with Copilot (gpt-5, claude-sonnet-4.5, etc.) | `gpt-5` |
 | `delayMs` | Minimum delay between requests (optional) | - |
 
 #### Example Full Config

@@ -73,10 +73,18 @@ func orchestratorLoop() {
 
 	// Initialize AI client based on configuration
 	var aiClient clients.AIClient
-	if cfg != nil && cfg.AIProvider == "ollama" {
-		aiClient = clients.NewOllamaClient(cfg.OllamaBaseURL, cfg.OllamaModel)
+	if cfg != nil {
+		switch cfg.AIProvider {
+		case "ollama":
+			aiClient = clients.NewOllamaClient(cfg.OllamaBaseURL, cfg.OllamaModel)
+		case "copilot":
+			aiClient = clients.NewCopilotClient(cfg.CopilotModel)
+		default:
+			// Default to Gemini
+			aiClient = &clients.GeminiClient{}
+		}
 	} else {
-		// Default to Gemini
+		// Default to Gemini if no config
 		aiClient = &clients.GeminiClient{}
 	}
 

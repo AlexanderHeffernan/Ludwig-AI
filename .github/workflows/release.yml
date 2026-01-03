@@ -22,6 +22,7 @@ jobs:
         id: version
         run: |
           LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LATEST=${LATEST#v}
           MAJOR=$(echo $LATEST | cut -d. -f1)
           MINOR=$(echo $LATEST | cut -d. -f2)
           PATCH=$(echo $LATEST | cut -d. -f3 | cut -d- -f1)

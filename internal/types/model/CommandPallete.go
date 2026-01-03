@@ -1,31 +1,35 @@
-package cli
+package model
+
 import (
 	"ludwig/internal/utils"
-	//"fmt"
-	"ludwig/internal/types"
 	"ludwig/internal/storage"
-	"github.com/google/uuid"
-	"strings"
+	"ludwig/internal/types/task"
 	"ludwig/internal/orchestrator"
+
+	"strings"
+	"time"
 	"strconv"
 	"os"
-	"time"
+
+	"github.com/google/uuid"
+	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/viewport"
 )
 
-func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
-	actions := []utils.Command {
+func PalleteCommands(taskStore *storage.FileTaskStorage) []Command {
+	actions := []Command {
 		{
 			Text: "add",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if !checkArgumentsCountMin(2, parts, true) {
 					return "Usage: add <task description> - Add a new task. Tasks can be multiple words. No quotation marks needed."
 				}
 
 				// skip the first part which is the command itself
-				newTask := &types.Task{
+				newTask := &task.Task{
 					Name: strings.Join(parts[1:], " "),
-					Status: types.Pending,
+					Status: task.Pending,
 					ID: uuid.New().String(),
 					CreatedAt: time.Now(),
 				}
@@ -41,7 +45,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 		{
 			Text: "delete",
 			Description: "delete <task ref> - Delete a task by it's ref, can be seen to the left of the task name on the kanban. Do not include the # symbol.",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if !checkArgumentsCount(2, parts) {
 					return "Usage: delete <task ref> - Delete a task by it's ref, can be seen to the left of the task name on the kanban."
@@ -70,7 +74,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 		},
 		{
 			Text: "start",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if !checkArgumentsCount(1, parts) {
 					return "Usage: start method takes no arguments"
@@ -82,7 +86,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 		},
 		{
 			Text: "stop",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if len(parts) > 1 {
 					//utils.Println("Usage: stop method takes no arguments")
@@ -97,7 +101,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 		{
 			Text: "clear",
 			Description: "clear - Clear the command line so that only the kanban board is visible",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if !checkArgumentsCount(1, parts) {
 					return  "Usage: clear method takes no arguments"
@@ -108,7 +112,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 		{
 			Text: "exit",
 			Description: "exit - Exit the CLI",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if !checkArgumentsCount(1, parts) {
 					return "Usage: exit method takes no arguments"
@@ -122,7 +126,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 		{
 			Text: "view",
 			Description: "view <task ref> - View the streamed output log of a task by it's ref. Do not include the # symbol.",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if !checkArgumentsCount(2, parts) {
 					return "Usage: view command takes 1 argument: <task ref>"
@@ -144,23 +148,36 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 					return "Task ref out of range."
 				}
 				taskToView := tasks[taskIndex]
-
 				filePath := "./.ludwig/" + taskToView.ResponseFile
 				fileContent := utils.ReadFileAsString(filePath)
-				return filePath + "\n" + utils.OutputLines(strings.Split(fileContent, "\n"))
+				output := filePath + "\n" + utils.OutputLines(strings.Split(fileContent, "\n"))
+
+				m.viewport = viewport.New(utils.TermWidth() - 4, utils.TermHeight() - 6)
+				m.viewport.MouseWheelEnabled = true
+				m.viewport.MouseWheelDelta = 3
+				m.viewport.Style.Padding(0, 0)
+				m.viewport.Style.Margin(0, 0)
+				m.viewport.SetContent(output)
+				m.viewport.GotoBottom()
+				m.viewingViewport = true
+				m.viewingTask = taskToView
+				m.ViewportUpdateLoop(utils.GetFileHash(m.filePath))
+				m.filePath = strings.SplitN(output, "\n", 2)[0]
+
+				return output
 			},
 		},
 	}
-	return append(actions, utils.Command {
+	return append(actions, Command {
 		Text: "help",
 		Description: "help - Show this help message",
-		Action: func(text string) string {
+		Action: func(text string, m *Model) string {
 			parts := strings.Fields(text)
 			if !checkArgumentsCount(1, parts) {
 				return "Usage: help method takes no arguments"
 			}
 			//utils.PrintHelp(actions)
-			return utils.PrintHelpTable(actions)
+			return PrintHelpTable(actions)
 		},
 	})
 }
@@ -176,4 +193,36 @@ func checkArgumentsCountMin(expected int, parts []string, canHaveMore bool) bool
 		return false
 	}
 	return true
+}
+
+func PrintHelpTable(actions []Command) string {
+	columns := []table.Column {
+		{Title: "Command", Width: 20},
+		{Title: "Description", Width: 200},
+	}
+	rows := genHelpTableRows(actions)
+	t := tableOptions(columns, rows)
+
+	return t.View()
+}
+
+func genHelpTableRows(actions []Command) []table.Row {
+	var rows []table.Row
+	for _, cmd := range actions {
+		rows = append(rows, table.Row{cmd.Text, cmd.Description})
+	}
+	rows = append(rows, table.Row{"help", "Show this help message"})
+	return rows
+}
+
+func tableOptions(columns []table.Column, rows []table.Row) table.Model {
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(false),
+	)
+	s := table.DefaultStyles()
+	s.Selected = s.Cell.Padding(0,0).Margin(0,0)
+	t.SetStyles(s)
+	return t
 }

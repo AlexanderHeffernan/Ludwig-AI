@@ -4,7 +4,7 @@ import (
 	"strings"
 	"encoding/json"
 	"time"
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 	"github.com/charmbracelet/lipgloss"
 	"crypto/sha256"
 	"sync"
@@ -200,10 +200,9 @@ func ThinkingString(m *cli.Model) string {
 }
 */
 
-func GetTaskByPath(tasks []types.Task, path string) *types.Task {
+func GetTaskByPath(tasks []task.Task, path string) *task.Task {
 	// remove the './.ludwig/' prefix from path
 	path = strings.TrimPrefix(path, "./.ludwig/")
-	DebugLog("GetTaskByPath: looking for path: " + path)
 	for _, task := range tasks {
 		if task.ResponseFile != path { continue; }
 		return &task

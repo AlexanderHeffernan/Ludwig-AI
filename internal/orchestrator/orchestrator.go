@@ -7,7 +7,7 @@ import (
 	"ludwig/internal/config"
 	"ludwig/internal/orchestrator/clients"
 	"ludwig/internal/storage"
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 )
 
 var (
@@ -104,7 +104,7 @@ func orchestratorLoop() {
 
 			// First pass: process NeedsReview tasks with responses
 			for _, t := range tasks {
-				if t.Status == types.NeedsReview && t.ReviewResponse != nil {
+				if t.Status == task.NeedsReview && t.ReviewResponse != nil {
 					// Try to acquire semaphore slot
 					select {
 					case semaphore <- struct{}{}:
@@ -119,7 +119,7 @@ func orchestratorLoop() {
 
 			// Second pass: process Pending tasks
 			for _, t := range tasks {
-				if t.Status == types.Pending {
+				if t.Status == task.Pending {
 					// Try to acquire semaphore slot
 					select {
 					case semaphore <- struct{}{}:
@@ -140,11 +140,11 @@ func orchestratorLoop() {
 }
 
 // processResumeTask handles a NeedsReview task with a user response.
-func processResumeTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClient, cfg *config.Config, t *types.Task) {
+func processResumeTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClient, cfg *config.Config, t *task.Task) {
 	defer wg.Done()
 	defer func() { <-semaphore }() // Release semaphore slot
 
-	t.Status = types.InProgress
+	t.Status = task.InProgress
 	if err := taskStore.UpdateTask(t); err != nil {
 		return
 	}
@@ -161,7 +161,7 @@ func processResumeTask(taskStore *storage.FileTaskStorage, aiClient clients.AICl
 	// Create response writer for streaming
 	respWriter, respPath, err := storage.NewResponseWriter(t.ID)
 	if err != nil {
-		t.Status = types.NeedsReview
+		t.Status = task.NeedsReview
 		_ = taskStore.UpdateTask(t)
 		return
 	}
@@ -175,12 +175,12 @@ func processResumeTask(taskStore *storage.FileTaskStorage, aiClient clients.AICl
 
 	_, err = aiClient.SendPromptWithDir(prompt, respWriter, t.WorktreePath)
 	if err != nil {
-		t.Status = types.NeedsReview
+		t.Status = task.NeedsReview
 		_ = taskStore.UpdateTask(t)
 		return
 	}
 
-	t.Status = types.Completed
+	t.Status = task.Completed
 	// ResponseFile already set above when streaming started
 	_ = taskStore.UpdateTask(t)
 
@@ -194,7 +194,7 @@ func processResumeTask(taskStore *storage.FileTaskStorage, aiClient clients.AICl
 }
 
 // processNewTask handles a Pending task that needs initial processing.
-func processNewTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClient, cfg *config.Config, t *types.Task) {
+func processNewTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClient, cfg *config.Config, t *task.Task) {
 	defer wg.Done()
 	defer func() { <-semaphore }() // Release semaphore slot
 
@@ -211,7 +211,7 @@ func processNewTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClien
 	t.BranchName = branchName
 	t.WorktreePath = worktreePath
 
-	t.Status = types.InProgress
+	t.Status = task.InProgress
 	if err := taskStore.UpdateTask(t); err != nil {
 		return
 	}
@@ -222,7 +222,7 @@ func processNewTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClien
 	// Create response writer for streaming
 	respWriter, respPath, err := storage.NewResponseWriter(t.ID)
 	if err != nil {
-		t.Status = types.Pending
+		t.Status = task.Pending
 		_ = taskStore.UpdateTask(t)
 		return
 	}
@@ -236,7 +236,7 @@ func processNewTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClien
 
 	response, err := aiClient.SendPromptWithDir(BuildTaskPrompt(t.Name), respWriter, t.WorktreePath)
 	if err != nil {
-		t.Status = types.Pending
+		t.Status = task.Pending
 		_ = taskStore.UpdateTask(t)
 		return
 	}
@@ -244,7 +244,7 @@ func processNewTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClien
 	// Check if response contains a review request
 	workInProgress, review, hasReview := parseReviewRequest(response)
 	if hasReview {
-		t.Status = types.NeedsReview
+		t.Status = task.NeedsReview
 		t.WorkInProgress = workInProgress
 		t.Review = review
 		// ResponseFile already set above when streaming started
@@ -252,7 +252,7 @@ func processNewTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClien
 		return
 	}
 
-	t.Status = types.Completed
+	t.Status = task.Completed
 	// ResponseFile already set above when streaming started
 	_ = taskStore.UpdateTask(t)
 
@@ -267,7 +267,7 @@ func processNewTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClien
 
 // parseReviewRequest extracts a review request and work-in-progress from the AI response
 // Returns (WorkInProgress, ReviewRequest, hasReview)
-func parseReviewRequest(response string) (string, *types.ReviewRequest, bool) {
+func parseReviewRequest(response string) (string, *task.ReviewRequest, bool) {
 	// Look for NEEDS_REVIEW markers
 	reviewStart := -1
 	reviewEnd := -1
@@ -300,10 +300,10 @@ func parseReviewRequest(response string) (string, *types.ReviewRequest, bool) {
 }
 
 // parseReviewBlock parses the content between NEEDS_REVIEW markers
-func parseReviewBlock(block string) *types.ReviewRequest {
+func parseReviewBlock(block string) *task.ReviewRequest {
 	lines := split(block, "\n")
 	var question, context string
-	var options []types.ReviewOption
+	var options []task.ReviewOption
 
 	for _, line := range lines {
 		line = trim(line)
@@ -325,7 +325,7 @@ func parseReviewBlock(block string) *types.ReviewRequest {
 		return nil
 	}
 
-	return &types.ReviewRequest{
+	return &task.ReviewRequest{
 		Question:  question,
 		Options:   options,
 		Context:   context,
@@ -334,7 +334,7 @@ func parseReviewBlock(block string) *types.ReviewRequest {
 }
 
 // parseOption extracts an option from "- id: x | label: y" format
-func parseOption(line string) *types.ReviewOption {
+func parseOption(line string) *task.ReviewOption {
 	// Remove leading "- id: "
 	if !hasPrefix(line, "- id:") {
 		return nil
@@ -358,7 +358,7 @@ func parseOption(line string) *types.ReviewOption {
 	label := trimPrefix(labelPart, "label:")
 	label = trim(label)
 
-	return &types.ReviewOption{
+	return &task.ReviewOption{
 		ID:    id,
 		Label: label,
 	}

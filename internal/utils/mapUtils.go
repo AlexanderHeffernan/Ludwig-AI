@@ -1,21 +1,21 @@
 package utils
 
 import (
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 	"sort"
 )
 
-func PointerSliceToValueSlice(pointers []*types.Task) []types.Task {
+func PointerSliceToValueSlice(pointers []*task.Task) []task.Task {
     if pointers == nil {
         return nil
     }
 
-    values := make([]types.Task, len(pointers))
+    values := make([]task.Task, len(pointers))
     for i, ptr := range pointers {
         if ptr != nil {
             values[i] = *ptr  // dereference the pointer
         }
-        // If ptr is nil, values[i] will be the zero value of types.Task
+        // If ptr is nil, values[i] will be the zero value of task.Task
     }
     sort.Slice(values, func(i, j int) bool {
 		return TaskComparator(&values[i], &values[j])
@@ -23,7 +23,7 @@ func PointerSliceToValueSlice(pointers []*types.Task) []types.Task {
 	return values
 }
 
-func TaskComparator(a, b *types.Task) bool {
+func TaskComparator(a, b *task.Task) bool {
 	if a == nil && b == nil {
 		return true
 	}

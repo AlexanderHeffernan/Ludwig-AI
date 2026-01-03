@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 	"syscall"
-	"github.com/charmbracelet/bubbles/table"
 )
 
 type KeyAction struct {
@@ -83,37 +82,7 @@ func PrintHelp(actions []Command) string {
 	return builder.String()
 }
 
-func genHelpTableRows(actions []Command) []table.Row {
-	var rows []table.Row
-	for _, cmd := range actions {
-		rows = append(rows, table.Row{cmd.Text, cmd.Description})
-	}
-	rows = append(rows, table.Row{"help", "Show this help message"})
-	return rows
-}
 
-func tableOptions(columns []table.Column, rows []table.Row) table.Model {
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithFocused(false),
-	)
-	s := table.DefaultStyles()
-	s.Selected = s.Cell.Padding(0,0).Margin(0,0)
-	t.SetStyles(s)
-	return t
-}
-
-func PrintHelpTable(actions []Command) string {
-	columns := []table.Column {
-		{Title: "Command", Width: 20},
-		{Title: "Description", Width: 200},
-	}
-	rows := genHelpTableRows(actions)
-	t := tableOptions(columns, rows)
-
-	return t.View()
-}
 
 func RequestInput(prompt string) string {
 	fmt.Print(prompt + ": ")

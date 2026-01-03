@@ -1,7 +1,6 @@
 package orchestrator
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -12,10 +11,13 @@ import (
 )
 
 var (
-	mu      sync.Mutex
-	running bool
-	stopCh  chan struct{}
-	wg      sync.WaitGroup
+	mu                sync.Mutex
+	running           bool
+	stopCh            chan struct{}
+	wg                sync.WaitGroup
+	rateLimitMu       sync.Mutex
+	lastRequestTime   time.Time
+	semaphore         chan struct{} // Limits concurrent tasks to 3
 )
 
 // Start launches the orchestrator loop in a goroutine.
@@ -27,6 +29,7 @@ func Start() {
 	}
 	running = true
 	stopCh = make(chan struct{})
+	semaphore = make(chan struct{}, 3) // Max 3 parallel tasks
 	wg.Add(1)
 	go orchestratorLoop()
 }
@@ -53,192 +56,197 @@ func IsRunning() bool {
 	return running
 }
 
-// orchestratorLoop processes tasks, polling for new ones.
+// orchestratorLoop polls for tasks and dispatches them to a worker pool.
 func orchestratorLoop() {
 	defer wg.Done()
 	taskStore, err := storage.NewFileTaskStorage()
 	if err != nil {
-		log.Printf("Failed to initialize task storage: %v", err)
+		// Silent failure - orchestrator runs in background
 		return
 	}
 	
 	// Load configuration (optional)
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Printf("Warning: Failed to load config: %v", err)
-	} else if cfg != nil {
-		log.Printf("Loaded config from ~/.ai-orchestrator/config.json")
+		// Config load failure is non-critical, continue without it
 	}
-	
+
 	gemini := &clients.GeminiClient{}
-	var lastRequestTime time.Time
 
 	for {
 		select {
 		case <-stopCh:
 			return
 		default:
-			// Process tasks in order: NeedsReview (with responses), then Pending
+			// Get all tasks and dispatch available ones
 			tasks, err := taskStore.ListTasks()
 			if err != nil {
-				log.Printf("Failed to list tasks: %v", err)
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			processed := false
 
-			// Check for NeedsReview tasks with responses
+			foundWork := false
+
+			// First pass: process NeedsReview tasks with responses
 			for _, t := range tasks {
 				if t.Status == types.NeedsReview && t.ReviewResponse != nil {
-					log.Printf("Resuming task %s with user response: %s", t.ID, t.ReviewResponse.ChosenLabel)
-					t.Status = types.InProgress
-					if err := taskStore.UpdateTask(t); err != nil {
-						log.Printf("Failed to set task %s to In Progress: %v", t.ID, err)
-						continue
+					// Try to acquire semaphore slot
+					select {
+					case semaphore <- struct{}{}:
+						foundWork = true
+						wg.Add(1)
+						go processResumeTask(taskStore, gemini, cfg, t)
+					default:
+						// No available slots, continue to next task
 					}
-
-					optionLabels := make([]string, len(t.Review.Options))
-					for i, opt := range t.Review.Options {
-						optionLabels[i] = opt.Label
-					}
-					prompt := BuildResumePrompt(t.Name, t.WorkInProgress, t.Review.Question, optionLabels, t.ReviewResponse.ChosenLabel, t.ReviewResponse.UserNotes)
-					
-					// Apply rate limiting before request
-					applyRateLimit(cfg, &lastRequestTime)
-					
-					// Create response writer for streaming
-					respWriter, respPath, err := storage.NewResponseWriter(t.ID)
-					if err != nil {
-						log.Printf("Error creating response writer for task %s: %v", t.ID, err)
-						t.Status = types.NeedsReview
-						_ = taskStore.UpdateTask(t)
-						continue
-					}
-					defer respWriter.Close()
-					
-					// Store response file path immediately so it's available during streaming
-					t.ResponseFile = respPath
-					if err := taskStore.UpdateTask(t); err != nil {
-						log.Printf("Error saving task %s response file path: %v", t.ID, err)
-					}
-					
-					response, err := gemini.SendPrompt(prompt, respWriter)
-					if err != nil {
-						log.Printf("Error resuming task %s: %v", t.ID, err)
-						t.Status = types.NeedsReview
-						_ = taskStore.UpdateTask(t)
-						continue
-					}
-					log.Printf("Completed task %s: Gemini response: %s", t.ID, response)
-					t.Status = types.Completed
-					// ResponseFile already set above when streaming started
-					_ = taskStore.UpdateTask(t)
-					
-					// Checkout back to main after task completion
-					if err := CheckoutBranch("main"); err != nil {
-						log.Printf("Warning: Failed to checkout main after task %s completion: %v", t.ID, err)
-					} else {
-						log.Printf("Checked out to main after completing task %s", t.ID)
-					}
-					
-					processed = true
-					break
 				}
 			}
 
-			if processed {
-				continue
-			}
-
-			// Process pending tasks
+			// Second pass: process Pending tasks
 			for _, t := range tasks {
 				if t.Status == types.Pending {
-					log.Printf("Starting task %s: %s", t.ID, t.Name)
-					
-					// Generate and create branch for this task
-					branchName, err := GenerateBranchName(t.Name)
-					if err != nil {
-						log.Printf("Failed to generate branch name for task %s: %v", t.ID, err)
-						continue
+					// Try to acquire semaphore slot
+					select {
+					case semaphore <- struct{}{}:
+						foundWork = true
+						wg.Add(1)
+						go processNewTask(taskStore, gemini, cfg, t)
+					default:
+						// No available slots, continue to next task
 					}
-					if err := CreateBranch(branchName); err != nil {
-						log.Printf("Failed to create branch %s for task %s: %v", branchName, t.ID, err)
-						continue
-					}
-					log.Printf("Created branch %s for task %s", branchName, t.ID)
-					t.BranchName = branchName
-					
-					t.Status = types.InProgress
-					if err := taskStore.UpdateTask(t); err != nil {
-						log.Printf("Failed to set task %s to In Progress: %v", t.ID, err)
-						continue
-					}
-					
-					// Apply rate limiting before request
-					applyRateLimit(cfg, &lastRequestTime)
-					
-					// Create response writer for streaming
-					respWriter, respPath, err := storage.NewResponseWriter(t.ID)
-					if err != nil {
-						log.Printf("Error creating response writer for task %s: %v", t.ID, err)
-						t.Status = types.Pending
-						_ = taskStore.UpdateTask(t)
-						continue
-					}
-					defer respWriter.Close()
-					
-					// Store response file path immediately so it's available during streaming
-					t.ResponseFile = respPath
-					if err := taskStore.UpdateTask(t); err != nil {
-						log.Printf("Error saving task %s response file path: %v", t.ID, err)
-					}
-					
-					response, err := gemini.SendPrompt(BuildTaskPrompt(t.Name), respWriter)
-					if err != nil {
-						log.Printf("Error sending task %s to Gemini: %v", t.ID, err)
-						t.Status = types.Pending
-						_ = taskStore.UpdateTask(t)
-						continue
-					}
-
-					// Check if response contains a review request
-					workInProgress, review, hasReview := parseReviewRequest(response)
-					if hasReview {
-						log.Printf("Task %s needs review: %s", t.ID, review.Question)
-						t.Status = types.NeedsReview
-						t.WorkInProgress = workInProgress
-						t.Review = review
-						// ResponseFile already set above when streaming started
-						_ = taskStore.UpdateTask(t)
-						processed = true
-						break
-					}
-
-					log.Printf("Completed task %s: Gemini response: %s", t.ID, response)
-					t.Status = types.Completed
-					// ResponseFile already set above when streaming started
-					_ = taskStore.UpdateTask(t)
-					
-					// Checkout back to main after task completion
-					if err := CheckoutBranch("main"); err != nil {
-						log.Printf("Warning: Failed to checkout main after task %s completion: %v", t.ID, err)
-					} else {
-						log.Printf("Checked out to main after completing task %s", t.ID)
-					}
-					
-					processed = true
-					break // Only process one task per loop
 				}
 			}
-			if !processed {
-				log.Printf("No pending tasks found. Waiting before polling again.")
-				time.Sleep(2 * time.Second) // No pending tasks, wait before polling again
+
+			if !foundWork {
+				time.Sleep(2 * time.Second) // No tasks available, wait before polling again
 			}
 		}
 	}
 }
 
+// processResumeTask handles a NeedsReview task with a user response.
+func processResumeTask(taskStore *storage.FileTaskStorage, gemini *clients.GeminiClient, cfg *config.Config, t *types.Task) {
+	defer wg.Done()
+	defer func() { <-semaphore }() // Release semaphore slot
 
+	t.Status = types.InProgress
+	if err := taskStore.UpdateTask(t); err != nil {
+		return
+	}
+
+	optionLabels := make([]string, len(t.Review.Options))
+	for i, opt := range t.Review.Options {
+		optionLabels[i] = opt.Label
+	}
+	prompt := BuildResumePrompt(t.Name, t.WorkInProgress, t.Review.Question, optionLabels, t.ReviewResponse.ChosenLabel, t.ReviewResponse.UserNotes)
+
+	// Apply rate limiting before request
+	applyRateLimit(cfg)
+
+	// Create response writer for streaming
+	respWriter, respPath, err := storage.NewResponseWriter(t.ID)
+	if err != nil {
+		t.Status = types.NeedsReview
+		_ = taskStore.UpdateTask(t)
+		return
+	}
+	defer respWriter.Close()
+
+	// Store response file path immediately so it's available during streaming
+	t.ResponseFile = respPath
+	if err := taskStore.UpdateTask(t); err != nil {
+		// Failure to save path is non-critical
+	}
+
+	_, err = gemini.SendPromptWithDir(prompt, respWriter, t.WorktreePath)
+	if err != nil {
+		t.Status = types.NeedsReview
+		_ = taskStore.UpdateTask(t)
+		return
+	}
+
+	t.Status = types.Completed
+	// ResponseFile already set above when streaming started
+	_ = taskStore.UpdateTask(t)
+
+	// Remove worktree after task completion
+	if t.WorktreePath != "" {
+		_ = RemoveWorktree(t.WorktreePath)
+		t.WorktreePath = ""
+		_ = taskStore.UpdateTask(t)
+	}
+}
+
+// processNewTask handles a Pending task that needs initial processing.
+func processNewTask(taskStore *storage.FileTaskStorage, gemini *clients.GeminiClient, cfg *config.Config, t *types.Task) {
+	defer wg.Done()
+	defer func() { <-semaphore }() // Release semaphore slot
+
+	// Generate and create worktree for this task
+	branchName, err := GenerateBranchName(t.Name)
+	if err != nil {
+		return
+	}
+
+	worktreePath, err := CreateWorktree(branchName, t.ID)
+	if err != nil {
+		return
+	}
+	t.BranchName = branchName
+	t.WorktreePath = worktreePath
+
+	t.Status = types.InProgress
+	if err := taskStore.UpdateTask(t); err != nil {
+		return
+	}
+
+	// Apply rate limiting before request
+	applyRateLimit(cfg)
+
+	// Create response writer for streaming
+	respWriter, respPath, err := storage.NewResponseWriter(t.ID)
+	if err != nil {
+		t.Status = types.Pending
+		_ = taskStore.UpdateTask(t)
+		return
+	}
+	defer respWriter.Close()
+
+	// Store response file path immediately so it's available during streaming
+	t.ResponseFile = respPath
+	if err := taskStore.UpdateTask(t); err != nil {
+		// Failure to save path is non-critical
+	}
+
+	response, err := gemini.SendPromptWithDir(BuildTaskPrompt(t.Name), respWriter, t.WorktreePath)
+	if err != nil {
+		t.Status = types.Pending
+		_ = taskStore.UpdateTask(t)
+		return
+	}
+
+	// Check if response contains a review request
+	workInProgress, review, hasReview := parseReviewRequest(response)
+	if hasReview {
+		t.Status = types.NeedsReview
+		t.WorkInProgress = workInProgress
+		t.Review = review
+		// ResponseFile already set above when streaming started
+		_ = taskStore.UpdateTask(t)
+		return
+	}
+
+	t.Status = types.Completed
+	// ResponseFile already set above when streaming started
+	_ = taskStore.UpdateTask(t)
+
+	// Remove worktree after task completion
+	if t.WorktreePath != "" {
+		_ = RemoveWorktree(t.WorktreePath)
+		t.WorktreePath = ""
+		_ = taskStore.UpdateTask(t)
+	}
+}
 
 // parseReviewRequest extracts a review request and work-in-progress from the AI response
 // Returns (WorkInProgress, ReviewRequest, hasReview)
@@ -386,21 +394,23 @@ func indexOf(s, sep string) int {
 	return -1
 }
 
-// applyRateLimit waits if necessary based on config rate limits
-func applyRateLimit(cfg *config.Config, lastRequestTime *time.Time) {
+// applyRateLimit waits if necessary based on config rate limits (thread-safe).
+func applyRateLimit(cfg *config.Config) {
 	if cfg == nil || cfg.DelayMs <= 0 {
 		return // No rate limiting configured
 	}
 
+	rateLimitMu.Lock()
+	defer rateLimitMu.Unlock()
+
 	now := time.Now()
-	timeSinceLastRequest := now.Sub(*lastRequestTime)
+	timeSinceLastRequest := now.Sub(lastRequestTime)
 	delay := time.Duration(cfg.DelayMs) * time.Millisecond
 
 	if timeSinceLastRequest < delay {
 		waitTime := delay - timeSinceLastRequest
-		log.Printf("Rate limiting: waiting %v before next request", waitTime)
 		time.Sleep(waitTime)
 	}
 
-	*lastRequestTime = time.Now()
+	lastRequestTime = time.Now()
 }

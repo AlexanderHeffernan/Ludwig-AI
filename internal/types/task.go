@@ -15,16 +15,17 @@ const (
 )
 
 type Task struct {
-	ID     string
-	Name   string
-	Status Status
-	CreatedAt   time.Time
+	ID        string
+	Name      string
+	Status    Status
+	CreatedAt time.Time
 
-	BranchName     string          // Git branch created for this task
-	WorkInProgress string          // Stores intermediate work before requesting review
+	BranchName     string // Git branch created for this task
+	WorktreePath   string // Path to the git worktree directory for this task
+	WorkInProgress string // Stores intermediate work before requesting review
 	Review         *ReviewRequest
 	ReviewResponse *ReviewResponse
-	ResponseFile   string          // Path to file containing AI response stream
+	ResponseFile   string // Path to file containing AI response stream
 }
 
 type ReviewRequest struct {

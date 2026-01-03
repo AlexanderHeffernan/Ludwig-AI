@@ -25,9 +25,17 @@ var modelFallbackChain = []string{
 // - Streams output in real-time to the provided writer
 // - On failure (non-rate-limit), falls back to the next weaker model
 // - Returns the complete response text once done
+// - Runs in the current working directory (main repo)
 func (g *GeminiClient) SendPrompt(prompt string, writer io.Writer) (string, error) {
+	return g.SendPromptWithDir(prompt, writer, "")
+}
+
+// SendPromptWithDir sends a prompt to Gemini in a specific working directory (e.g., worktree).
+// - Same behavior as SendPrompt but executes in the provided workDir
+// - If workDir is empty, uses current working directory
+func (g *GeminiClient) SendPromptWithDir(prompt string, writer io.Writer, workDir string) (string, error) {
 	for _, model := range modelFallbackChain {
-		response, err := g.SendPromptWithModel(prompt, writer, model)
+		response, err := g.SendPromptWithModelAndDir(prompt, writer, model, workDir)
 		
 		// If successful, return
 		if err == nil {
@@ -53,7 +61,15 @@ func (g *GeminiClient) SendPrompt(prompt string, writer io.Writer) (string, erro
 // - Retries up to 3 times on rate limit (429) errors with exponential backoff
 // - Includes partial work from previous attempt so AI can catch up and continue
 // - Returns the complete response text once done
+// - Runs in the current working directory (main repo)
 func (g *GeminiClient) SendPromptWithModel(prompt string, writer io.Writer, model string) (string, error) {
+	return g.SendPromptWithModelAndDir(prompt, writer, model, "")
+}
+
+// SendPromptWithModelAndDir sends a prompt to Gemini in a specific directory using a specific model
+// - Same behavior as SendPromptWithModel but executes in the provided workDir
+// - If workDir is empty, uses current working directory
+func (g *GeminiClient) SendPromptWithModelAndDir(prompt string, writer io.Writer, model string, workDir string) (string, error) {
 	maxRetries := 3
 	baseDelay := 30 * time.Second
 	var lastPartialResponse string
@@ -65,7 +81,7 @@ func (g *GeminiClient) SendPromptWithModel(prompt string, writer io.Writer, mode
 			promptToUse = buildRetryPrompt(prompt, lastPartialResponse)
 		}
 
-		response, err := g.executeStream(promptToUse, writer, model)
+		response, err := g.executeStreamInDir(promptToUse, writer, model, workDir)
 
 		// Check for rate limit error (429)
 		if isRateLimitError(response, err) {
@@ -91,9 +107,21 @@ func (g *GeminiClient) SendPromptWithModel(prompt string, writer io.Writer, mode
 }
 
 // executeStream executes a single streaming request to Gemini using a specific model
+// - Runs in the current working directory (main repo)
 func (g *GeminiClient) executeStream(prompt string, writer io.Writer, model string) (string, error) {
+	return g.executeStreamInDir(prompt, writer, model, "")
+}
+
+// executeStreamInDir executes a single streaming request to Gemini in a specific working directory
+// - If workDir is empty, uses current working directory
+func (g *GeminiClient) executeStreamInDir(prompt string, writer io.Writer, model string, workDir string) (string, error) {
 	// Use --output-format stream-json for real-time event streaming
 	cmd := exec.Command("gemini", "--yolo", "--model", model, "--output-format", "stream-json", prompt)
+	
+	// Set working directory for the command
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
 
 	// Create a pipe to read stdout in real-time
 	stdout, err := cmd.StdoutPipe()

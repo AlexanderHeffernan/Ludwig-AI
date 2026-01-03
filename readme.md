@@ -1,6 +1,6 @@
 # Ludwig: AI Task Orchestrator
 
-Ludwig is an AI-powered task orchestrator that automates project work through integrated AI clients (currently Gemini). It manages task execution, git workflows, and human review cycles through a command-line interface.
+Ludwig is an AI-powered task orchestrator that automates project work through integrated AI clients (Gemini, Ollama, or GitHub Copilot CLI). It manages task execution, git workflows, and human review cycles through a command-line interface. Works online with Gemini/Copilot or completely offline with Ollama.
 
 ## Project Structure
 
@@ -14,14 +14,17 @@ ludwig/
 │   │   ├── commandPallete.go         # Command definitions
 │   │   └── kanban.go                 # Kanban board display
 │   ├── config/                       # Configuration management
-│   │   └── config.json               # User config location: ~/.ai-orchestrator/config.json
+│   │   └── config.json               # Config location: .ludwig/config.json
 │   ├── mcp/                          # Model context protocol (future enhancement)
 │   ├── orchestrator/                 # Core orchestration logic
 │   │   ├── orchestrator.go           # Main orchestrator loop
 │   │   ├── prompts.go                # System prompts for AI agents
 │   │   ├── git.go                    # Git operations
 │   │   └── clients/
-│   │       └── gemini.go             # Gemini AI client
+│   │       ├── aiclient.go           # AIClient interface
+│   │       ├── gemini.go             # Gemini AI client
+│   │       ├── ollama.go             # Ollama AI client
+│   │       └── copilot.go            # GitHub Copilot CLI client
 │   ├── storage/                      # Data persistence
 │   │   ├── taskStorage.go            # Task file storage
 │   │   ├── responseStorage.go        # AI response streaming
@@ -183,10 +186,10 @@ type Task struct {
 
 1. **Initialization**: Loads tasks from storage and creates task branches
 2. **Polling**: Checks for pending tasks and processes them in order
-3. **AI Processing**: Sends tasks to Gemini with system prompt and task description
+3. **AI Processing**: Sends tasks to AI client with system prompt and task description
 4. **Review Detection**: Parses responses for `---NEEDS_REVIEW---` markers
 5. **Review Handling**: If review needed, waits for human decision
-6. **Completion**: Marks tasks complete and checks out to main branch
+6. **Completion**: Marks tasks complete, auto-commits any uncommitted changes, and removes worktree
 
 ### Task Processing Flow
 
@@ -214,7 +217,10 @@ Does response contain ---NEEDS_REVIEW---?
 - Worktrees are stored in `.worktrees/<task-id>/` directory
 - AI agents work in their own worktree, allowing parallel task execution
 - User can continue working in the main branch while AI works on other tasks
-- After task completion, the worktree is automatically removed
+- After task completion:
+  - Any uncommitted changes are automatically staged and committed to preserve work
+  - Worktree is removed, leaving the task branch for user review
+  - User can then review the branch and decide to merge, rebase, or discard
 - This design allows multiple tasks to be processed simultaneously without blocking the user's workflow
 
 ## Testing Guidelines
@@ -302,6 +308,107 @@ For detailed coverage information, see [TEST_COVERAGE_IMPROVEMENTS.md](./TEST_CO
 2. Update tests in `test/orchestrator/`
 3. Test with actual tasks to verify AI understanding
 
+## AI Provider Configuration
+
+Ludwig supports multiple AI providers for offline capability and flexibility:
+
+### Gemini (Default)
+
+Requires Google Gemini API access via the `gemini` CLI tool.
+
+```bash
+# Install gemini CLI (requires authentication with Google account)
+# See: https://github.com/google/generative-ai-cli
+
+# Gemini is the default provider, no configuration needed
+```
+
+### GitHub Copilot CLI
+
+Use your GitHub Copilot subscription with free education credits.
+
+#### Setup
+
+1. **Install GitHub Copilot CLI**:
+   ```bash
+   # Via Homebrew (macOS/Linux)
+   brew install --cask github-copilot-cli
+   
+   # Or download from: https://github.com/github/gh-copilot
+   ```
+
+2. **Authenticate with GitHub**:
+   ```bash
+   copilot auth login
+   ```
+
+3. **Configure Ludwig** to use Copilot:
+   ```bash
+   # Edit or create .ludwig/config.json (in your project root)
+   {
+       "aiProvider": "copilot",
+       "copilotModel": "gpt-5"
+   }
+   ```
+
+   Supported models: `gpt-5`, `gpt-5-mini`, `claude-sonnet-4.5`, `claude-haiku-4.5`, `claude-opus-4.5`, etc.
+   
+   Note: Ludwig uses `copilot --model <model> -p <prompt> --allow-all-tools` for non-interactive automation.
+
+### Ollama (Offline)
+
+Run completely offline using open-source models via Ollama.
+
+#### Setup
+
+1. **Install Ollama**: https://ollama.ai/
+
+2. **Start Ollama service**:
+   ```bash
+   ollama serve
+   ```
+
+3. **Download a model** (in another terminal):
+   ```bash
+   # Recommended models (in order of capability/speed):
+   ollama pull mistral          # Fast, general purpose (~4GB)
+   ollama pull neural-chat      # Good quality (~4GB)
+   ollama pull dolphin-mixtral  # High quality (~26GB)
+   ```
+
+4. **Configure Ludwig** to use Ollama:
+   ```bash
+   # Create/edit .ludwig/config.json (in your project root)
+   {
+       "aiProvider": "ollama",
+       "ollamaBaseURL": "http://localhost:11434",
+       "ollamaModel": "mistral"
+   }
+   ```
+
+#### Configuration Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `aiProvider` | `"gemini"`, `"ollama"`, or `"copilot"` | `"gemini"` |
+| `ollamaBaseURL` | Base URL of Ollama server | `http://localhost:11434` |
+| `ollamaModel` | Model name to use with Ollama | `mistral` |
+| `copilotModel` | Model name to use with Copilot (gpt-5, claude-sonnet-4.5, etc.) | `gpt-5` |
+| `delayMs` | Minimum delay between requests (optional) | - |
+
+#### Example Full Config
+
+Create `.ludwig/config.json` in your project root:
+
+```json
+{
+    "aiProvider": "ollama",
+    "ollamaBaseURL": "http://localhost:11434",
+    "ollamaModel": "mistral",
+    "delayMs": 1000
+}
+```
+
 ## Troubleshooting
 
 ### Tests Failing
@@ -319,9 +426,19 @@ For detailed coverage information, see [TEST_COVERAGE_IMPROVEMENTS.md](./TEST_CO
 
 ### Orchestrator Not Starting
 
+#### With Gemini
 1. Check if Gemini API key is set in environment
-2. Verify git repository is initialized: `git status`
-3. Check task storage is accessible: `ls ~/.ai-orchestrator/`
+2. Verify `gemini` CLI tool is installed and in PATH: `which gemini`
+3. Verify git repository is initialized: `git status`
+4. Check task storage is accessible: `ls ~/.ai-orchestrator/`
+
+#### With Ollama
+1. Verify Ollama is running: `curl http://localhost:11434/api/tags`
+2. Check that a model is installed: `ollama list`
+3. Verify config file exists: `.ludwig/config.json`
+4. Verify config has `"aiProvider": "ollama"`
+5. Check config points to correct Ollama URL: `ollamaBaseURL`
+6. Verify git repository is initialized: `git status`
 
 ## Dependencies
 
@@ -348,10 +465,12 @@ MIT (adjust if needed)
 
 ## Next Steps / Future Enhancements
 
-- [ ] Support additional AI clients beyond Gemini
+- [x] Support additional AI clients (Gemini + Ollama)
+- [ ] Support additional AI clients (Claude, LLaMA, etc.)
 - [ ] Model Context Protocol (MCP) integration
 - [ ] Advanced task scheduling and prioritization
 - [ ] Web UI for task management
 - [ ] Webhook integration for automated task triggers
 - [ ] Task templates and presets
 - [ ] Performance metrics and analytics
+- [ ] Local embedding support for better context

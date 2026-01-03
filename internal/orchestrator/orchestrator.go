@@ -71,7 +71,22 @@ func orchestratorLoop() {
 		// Config load failure is non-critical, continue without it
 	}
 
-	gemini := &clients.GeminiClient{}
+	// Initialize AI client based on configuration
+	var aiClient clients.AIClient
+	if cfg != nil {
+		switch cfg.AIProvider {
+		case "ollama":
+			aiClient = clients.NewOllamaClient(cfg.OllamaBaseURL, cfg.OllamaModel)
+		case "copilot":
+			aiClient = clients.NewCopilotClient(cfg.CopilotModel)
+		default:
+			// Default to Gemini
+			aiClient = &clients.GeminiClient{}
+		}
+	} else {
+		// Default to Gemini if no config
+		aiClient = &clients.GeminiClient{}
+	}
 
 	for {
 		select {
@@ -95,7 +110,7 @@ func orchestratorLoop() {
 					case semaphore <- struct{}{}:
 						foundWork = true
 						wg.Add(1)
-						go processResumeTask(taskStore, gemini, cfg, t)
+						go processResumeTask(taskStore, aiClient, cfg, t)
 					default:
 						// No available slots, continue to next task
 					}
@@ -110,7 +125,7 @@ func orchestratorLoop() {
 					case semaphore <- struct{}{}:
 						foundWork = true
 						wg.Add(1)
-						go processNewTask(taskStore, gemini, cfg, t)
+						go processNewTask(taskStore, aiClient, cfg, t)
 					default:
 						// No available slots, continue to next task
 					}
@@ -125,7 +140,7 @@ func orchestratorLoop() {
 }
 
 // processResumeTask handles a NeedsReview task with a user response.
-func processResumeTask(taskStore *storage.FileTaskStorage, gemini *clients.GeminiClient, cfg *config.Config, t *types.Task) {
+func processResumeTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClient, cfg *config.Config, t *types.Task) {
 	defer wg.Done()
 	defer func() { <-semaphore }() // Release semaphore slot
 
@@ -158,7 +173,7 @@ func processResumeTask(taskStore *storage.FileTaskStorage, gemini *clients.Gemin
 		// Failure to save path is non-critical
 	}
 
-	_, err = gemini.SendPromptWithDir(prompt, respWriter, t.WorktreePath)
+	_, err = aiClient.SendPromptWithDir(prompt, respWriter, t.WorktreePath)
 	if err != nil {
 		t.Status = types.NeedsReview
 		_ = taskStore.UpdateTask(t)
@@ -169,8 +184,9 @@ func processResumeTask(taskStore *storage.FileTaskStorage, gemini *clients.Gemin
 	// ResponseFile already set above when streaming started
 	_ = taskStore.UpdateTask(t)
 
-	// Remove worktree after task completion
+	// Commit any uncommitted work before removing worktree
 	if t.WorktreePath != "" {
+		_ = CommitAnyChanges(t.WorktreePath, t.ID)
 		_ = RemoveWorktree(t.WorktreePath)
 		t.WorktreePath = ""
 		_ = taskStore.UpdateTask(t)
@@ -178,7 +194,7 @@ func processResumeTask(taskStore *storage.FileTaskStorage, gemini *clients.Gemin
 }
 
 // processNewTask handles a Pending task that needs initial processing.
-func processNewTask(taskStore *storage.FileTaskStorage, gemini *clients.GeminiClient, cfg *config.Config, t *types.Task) {
+func processNewTask(taskStore *storage.FileTaskStorage, aiClient clients.AIClient, cfg *config.Config, t *types.Task) {
 	defer wg.Done()
 	defer func() { <-semaphore }() // Release semaphore slot
 
@@ -218,7 +234,7 @@ func processNewTask(taskStore *storage.FileTaskStorage, gemini *clients.GeminiCl
 		// Failure to save path is non-critical
 	}
 
-	response, err := gemini.SendPromptWithDir(BuildTaskPrompt(t.Name), respWriter, t.WorktreePath)
+	response, err := aiClient.SendPromptWithDir(BuildTaskPrompt(t.Name), respWriter, t.WorktreePath)
 	if err != nil {
 		t.Status = types.Pending
 		_ = taskStore.UpdateTask(t)
@@ -240,8 +256,9 @@ func processNewTask(taskStore *storage.FileTaskStorage, gemini *clients.GeminiCl
 	// ResponseFile already set above when streaming started
 	_ = taskStore.UpdateTask(t)
 
-	// Remove worktree after task completion
+	// Commit any uncommitted work before removing worktree
 	if t.WorktreePath != "" {
+		_ = CommitAnyChanges(t.WorktreePath, t.ID)
 		_ = RemoveWorktree(t.WorktreePath)
 		t.WorktreePath = ""
 		_ = taskStore.UpdateTask(t)

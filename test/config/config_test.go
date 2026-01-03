@@ -21,18 +21,18 @@ func TestLoadConfigFileNotExists(t *testing.T) {
 }
 
 func TestLoadConfigValid(t *testing.T) {
-	// Create a temporary config file
-	home, err := os.UserHomeDir()
+	// Create a temporary config file in .ludwig directory
+	cwd, err := os.Getwd()
 	if err != nil {
-		t.Fatalf("failed to get home dir: %v", err)
+		t.Fatalf("failed to get current dir: %v", err)
 	}
 
-	configDir := filepath.Join(home, ".ai-orchestrator")
-	configFile := filepath.Join(configDir, "config.json")
+	ludwigDir := filepath.Join(cwd, ".ludwig")
+	configFile := filepath.Join(ludwigDir, "config.json")
 
 	// Ensure directory exists
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		t.Fatalf("failed to create config dir: %v", err)
+	if err := os.MkdirAll(ludwigDir, 0755); err != nil {
+		t.Fatalf("failed to create .ludwig dir: %v", err)
 	}
 
 	// Write test config
@@ -58,17 +58,17 @@ func TestLoadConfigValid(t *testing.T) {
 }
 
 func TestLoadConfigInvalidJSON(t *testing.T) {
-	home, err := os.UserHomeDir()
+	cwd, err := os.Getwd()
 	if err != nil {
-		t.Fatalf("failed to get home dir: %v", err)
+		t.Fatalf("failed to get current dir: %v", err)
 	}
 
-	configDir := filepath.Join(home, ".ai-orchestrator")
-	configFile := filepath.Join(configDir, "config.json")
+	ludwigDir := filepath.Join(cwd, ".ludwig")
+	configFile := filepath.Join(ludwigDir, "config.json")
 
 	// Ensure directory exists
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		t.Fatalf("failed to create config dir: %v", err)
+	if err := os.MkdirAll(ludwigDir, 0755); err != nil {
+		t.Fatalf("failed to create .ludwig dir: %v", err)
 	}
 
 	// Write invalid JSON
@@ -85,5 +85,54 @@ func TestLoadConfigInvalidJSON(t *testing.T) {
 	}
 	if cfg != nil {
 		t.Errorf("expected nil config on error, got %v", cfg)
+	}
+}
+
+func TestSaveConfig(t *testing.T) {
+	// Create config and save it
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current dir: %v", err)
+	}
+
+	ludwigDir := filepath.Join(cwd, ".ludwig")
+	configFile := filepath.Join(ludwigDir, "config.json")
+
+	// Cleanup before test
+	defer os.Remove(configFile)
+
+	testConfig := &config.Config{
+		DelayMs:       1000,
+		AIProvider:    "ollama",
+		OllamaBaseURL: "http://localhost:11434",
+		OllamaModel:   "mistral",
+	}
+
+	// Save config
+	if err := config.SaveConfig(testConfig); err != nil {
+		t.Fatalf("failed to save config: %v", err)
+	}
+
+	// Verify file was created
+	if _, err := os.Stat(configFile); err != nil {
+		t.Fatalf("config file not created: %v", err)
+	}
+
+	// Load and verify content
+	loadedCfg, err := config.LoadConfig()
+	if err != nil {
+		t.Fatalf("failed to load saved config: %v", err)
+	}
+	if loadedCfg == nil {
+		t.Fatalf("expected config, got nil")
+	}
+	if loadedCfg.DelayMs != 1000 {
+		t.Errorf("expected DelayMs 1000, got %d", loadedCfg.DelayMs)
+	}
+	if loadedCfg.AIProvider != "ollama" {
+		t.Errorf("expected AIProvider 'ollama', got %s", loadedCfg.AIProvider)
+	}
+	if loadedCfg.OllamaModel != "mistral" {
+		t.Errorf("expected OllamaModel 'mistral', got %s", loadedCfg.OllamaModel)
 	}
 }

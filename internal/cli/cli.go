@@ -13,7 +13,7 @@ func GetTasksAndDisplayKanban(taskStore *storage.FileTaskStorage) {
 		return
 	}
 	DisplayKanban(utils.PointerSliceToValueSlice(tasks))
-} 
+}
 
 /*
 func Execute() {

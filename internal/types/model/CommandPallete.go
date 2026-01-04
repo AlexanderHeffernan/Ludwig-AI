@@ -5,6 +5,7 @@ import (
 	"ludwig/internal/storage"
 	"ludwig/internal/types/task"
 	"ludwig/internal/orchestrator"
+	"ludwig/internal/types/progressBar"
 
 	"strings"
 	"time"
@@ -150,19 +151,27 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []Command {
 				taskToView := tasks[taskIndex]
 				filePath := "./.ludwig/" + taskToView.ResponseFile
 				fileContent := utils.ReadFileAsString(filePath)
-				output := filePath + "\n" + utils.OutputLines(strings.Split(fileContent, "\n"))
+				output := utils.OutputLines(strings.Split(fileContent, "\n"))
 
-				m.viewport = viewport.New(utils.TermWidth() - 4, utils.TermHeight() - 6)
+				m.viewport = viewport.New(utils.TermWidth() - 6, utils.TermHeight() - 6)
 				m.viewport.MouseWheelEnabled = true
 				m.viewport.MouseWheelDelta = 3
 				m.viewport.Style.Padding(0, 0)
 				m.viewport.Style.Margin(0, 0)
 				m.viewport.SetContent(output)
 				m.viewport.GotoBottom()
+				m.progressBar = progressBar.NewModel(&m.viewport)
 				m.viewingViewport = true
-				m.viewingTask = taskToView
-				m.ViewportUpdateLoop(utils.GetFileHash(m.filePath))
-				m.filePath = strings.SplitN(output, "\n", 2)[0]
+				m.viewingTask = &taskToView
+				m.filePath = filePath
+				
+				// Initialize file change detection
+				m.fileChangeInfo, err = utils.InitFileChangeInfo(m.filePath)
+				if err != nil {
+					return "Error initializing file change detection: " + err.Error()
+				}
+				
+				m.ViewportUpdateLoop()
 
 				return output
 			},

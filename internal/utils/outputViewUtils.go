@@ -9,6 +9,10 @@ import (
 	"crypto/sha256"
 	"sync"
 	"regexp"
+	"os"
+	"hash/fnv"
+	"io"
+	"bytes"
 )
 
 var OUTPUT_STYLE lipgloss.Style = lipgloss.NewStyle().Padding(0, 0)
@@ -41,6 +45,81 @@ func GetFileHash(filePath string) []byte {
 	fileContent := ReadFileAsString(filePath)
 	h.Write([]byte(fileContent))
 	return h.Sum(nil)
+}
+
+// FileChangeInfo holds file change detection state
+type FileChangeInfo struct {
+	LastModTime time.Time
+	LastHash    []byte
+}
+
+// getFileHashFast computes a fast hash using FNV instead of SHA256
+func getFileHashFast(filePath string) ([]byte, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	
+	h := fnv.New64a() // Much faster than SHA256 for change detection
+	_, err = io.Copy(h, file)
+	if err != nil {
+		return nil, err
+	}
+	
+	return h.Sum(nil), nil
+}
+
+// HasFileChangedHybrid uses a hybrid approach: fast mod time check first, then hash if needed
+func HasFileChangedHybrid(filePath string, changeInfo *FileChangeInfo) (bool, string, error) {
+	stat, err := os.Stat(filePath)
+	if err != nil {
+		return true, "", err
+	}
+	
+	// Quick check: if mod time unchanged, file definitely hasn't changed
+	if !stat.ModTime().After(changeInfo.LastModTime) {
+		return false, "", nil
+	}
+	
+	// Mod time changed, now check hash to be sure and get content
+	newHash, err := getFileHashFast(filePath)
+	if err != nil {
+		return true, "", err
+	}
+	
+	changed := !bytes.Equal(newHash, changeInfo.LastHash)
+	if changed {
+		// Update the change info
+		changeInfo.LastModTime = stat.ModTime()
+		changeInfo.LastHash = newHash
+		
+		// Read content only if file actually changed
+		fileContent := ReadFileAsString(filePath)
+		return true, fileContent, nil
+	}
+	
+	// Hash is the same, update mod time but no content change
+	changeInfo.LastModTime = stat.ModTime()
+	return false, "", nil
+}
+
+// InitFileChangeInfo initializes change detection state for a file
+func InitFileChangeInfo(filePath string) (*FileChangeInfo, error) {
+	stat, err := os.Stat(filePath)
+	if err != nil {
+		return nil, err
+	}
+	
+	hash, err := getFileHashFast(filePath)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &FileChangeInfo{
+		LastModTime: stat.ModTime(),
+		LastHash:    hash,
+	}, nil
 }
 
 type DelayedTask struct {

@@ -4,6 +4,7 @@ import (
 	"ludwig/internal/types/task"
 	"ludwig/internal/utils"
 	"ludwig/internal/kanban"
+	"ludwig/internal/types/progressBar"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/lipgloss"
@@ -12,9 +13,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 	"time"
-	"bytes"
 	"ludwig/internal/orchestrator"
 	"fmt"
+	"strconv"
+	"math"
 )
 
 type Model struct {
@@ -27,8 +29,10 @@ type Model struct {
 	spinner   spinner.Model
 	viewport  viewport.Model
 	viewingViewport bool
+	progressBar progressBar.Model
 	filePath  string
-	viewingTask task.Task
+	viewingTask *task.Task
+	fileChangeInfo *utils.FileChangeInfo
 }
 
 type Command struct {
@@ -76,16 +80,16 @@ func NewModel(taskStore *storage.FileTaskStorage) *Model {
 
 func (m *Model) Init() tea.Cmd {
 	/*
-return tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
-return tickMsg(t)
-})
-*/
+	return tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
+	return tickMsg(t)
+	})
+	*/
 	return tea.Batch(
 		m.spinner.Tick, // This keeps the spinner animating (~10-15 FPS by default)
 		tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
 			return tickMsg(t)
 		}),
-		)
+	)
 }
 
 // Update handles incoming messages and updates the model.
@@ -94,6 +98,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	//m.textInput, cmd = m.textInput.Update(msg)
 
 	m.textInput, cmd = m.textInput.Update(msg)
+	m.progressBar.Update(msg)
 	// Dynamically adjust height based on content wrapping
 	content := m.textInput.Value()
 	if content == "" {
@@ -133,6 +138,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		inputWidth := max(termWidth - 6, 20) // Account for border + padding
 
 		m.textInput.SetWidth(inputWidth)
+		UpdateViewportWidth(m)
 		return m, nil
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -141,6 +147,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Exit full screen output view
 				m.viewport = viewport.Model{}
 				m.viewingViewport = false
+				m.fileChangeInfo = nil  // Clean up file change detection
 				return m, nil
 			}
 			return m, tea.Quit
@@ -194,14 +201,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		// On each tick, reload tasks from storage.
-		tasks, err := m.taskStore.ListTasks()
-		if err != nil {
-			m.err = err
-		} else {
-			if len(tasks) != len(m.tasks) {
-				m.tasks = utils.PointerSliceToValueSlice(tasks)
-			}
-		}
+		m.UpdateTasks()
 		// Return a new tick command to continue polling.
 		return m, tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
 			return tickMsg(t)
@@ -226,26 +226,89 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 const VIEWPORT_CONTROLS = "\n(Press Ctrl+S to scroll down, Ctrl+W to scroll up, Esc to exit view)"
+
+// getScrollbarChars generates scrollbar characters for each line based on viewport state
+func (m *Model) getScrollbarChars(numLines int) []string {
+	if m.viewport.TotalLineCount() <= m.viewport.Height {
+		// No scrollbar needed if content fits entirely
+		result := make([]string, numLines)
+		for i := range result {
+			result[i] = " "
+		}
+		return result
+	}
+
+	// Calculate scrollbar properties
+	totalLines := float64(m.viewport.TotalLineCount())
+	visibleLines := float64(m.viewport.Height)
+	scrollbarHeight := math.Max(1, visibleLines/totalLines*float64(numLines))
+	scrollbarTop := (float64(m.viewport.YOffset) / (totalLines - visibleLines)) * (float64(numLines) - scrollbarHeight)
+
+	var scrollbarChars []string
+	for i := 0; i < numLines; i++ {
+		if float64(i) >= scrollbarTop && float64(i) < scrollbarTop+scrollbarHeight {
+			scrollbarChars = append(scrollbarChars, "█")
+		} else {
+			scrollbarChars = append(scrollbarChars, "│")
+		}
+	}
+
+	return scrollbarChars
+}
+
+// renderViewportWithScrollbar renders the viewport content combined with a scrollbar
+func (m *Model) renderViewportWithScrollbar() string {
+	viewportContent := m.viewport.View()
+	contentLines := strings.Split(viewportContent, "\n")
+	
+	// Get scrollbar characters for each line
+	scrollbarChars := m.getScrollbarChars(len(contentLines))
+	
+	var result strings.Builder
+	for i, contentLine := range contentLines {
+		// Pad the content line to the viewport width to ensure scrollbar appears at the right edge
+		paddedLine := contentLine
+		currentWidth := len([]rune(contentLine)) // Use runes to handle unicode properly
+		viewportWidth := m.viewport.Width
+		
+		// Pad with spaces if the line is shorter than viewport width
+		if currentWidth < viewportWidth {
+			paddedLine += strings.Repeat(" ", viewportWidth - currentWidth - 1)
+		}
+		
+		// Add scrollbar character at the end
+		if i < len(scrollbarChars) {
+			paddedLine += scrollbarChars[i]
+		}
+		
+		result.WriteString(paddedLine)
+		
+		// Add newline except for the last line
+		if i < len(contentLines)-1 {
+			result.WriteString("\n")
+		}
+	}
+	
+	return result.String()
+}
 // View renders the UI.
 func (m *Model) View() string {
 	var s strings.Builder
 	if m.viewingViewport {
+		s.WriteString(m.progressBar.View())
 		// Render full screen output view
 		bubbleStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			Width(utils.TermWidth() - 4).
+			Width(utils.TermWidth() - 5).
 			Height(utils.TermHeight() - 8).
 			BorderForeground(lipgloss.Color("62")).
 			Padding(0, 1).
 			Margin(1, 1)
 
-
 		spinnerOn := m.viewingTask.Status == task.InProgress && orchestrator.IsRunning()
 
-		//spinnerOn = true
-
 		insideBubble := strings.Builder{}
-		insideBubble.WriteString(m.viewport.View() + "\n")
+		insideBubble.WriteString(m.viewport.View())
 		if spinnerOn {
 			utils.DebugLog("Rendering spinner in viewport view")
 			insideBubble.WriteString("\n" + m.spinner.View() + loadingStyle.Render(" Working on it"))
@@ -301,20 +364,62 @@ func (m *Model) View() string {
 	return s.String()
 }
 
-func (m *Model) ViewportUpdateLoop(lastHash []byte)  {
+func (m *Model) ViewportUpdateLoop()  {
 	time.AfterFunc(2*time.Second, func() {
-		if !m.viewingViewport {
+		if !m.viewingViewport || m.fileChangeInfo == nil {
 			return
 		}
-		currentHash, fileContent := utils.GetFileContentHash(m.filePath)
-		if bytes.Equal(currentHash, lastHash) {
-			m.ViewportUpdateLoop(lastHash)
+		
+		changed, fileContent, err := utils.HasFileChangedHybrid(m.filePath, m.fileChangeInfo)
+		if err != nil {
+			// Handle error, maybe retry or log
+			m.ViewportUpdateLoop()
 			return
 		}
-		m.viewport.SetContent(utils.OutputLines(strings.Split(fileContent, "\n")))
-		if m.viewport.ScrollPercent() > 0.95 {
+		
+		if !changed {
+			m.ViewportUpdateLoop()
+			return
+		}
+		
+		scrollPrcnt := m.viewport.ScrollPercent()
+		utils.DebugLog(strconv.FormatFloat(scrollPrcnt, 'f', -1, 64))
+		atBottom := scrollPrcnt > 0.95
+		content := utils.OutputLines(strings.Split(fileContent, "\n"))
+		m.viewport.SetContent(content)
+		if atBottom {
 			m.viewport.GotoBottom()
 		}
-		m.ViewportUpdateLoop(currentHash)
+		m.ViewportUpdateLoop()
 	})
+}
+
+func (m *Model) UpdateTasks() {
+	tasks, err := m.taskStore.ListTasks()
+	if err != nil {
+		m.err = err
+	} else {
+		m.tasks = utils.PointerSliceToValueSlice(tasks)
+	}
+
+	if m.viewingTask == nil { return }
+	// Refresh the viewing task details if in viewport mode
+	updatedTask, err := m.taskStore.GetTask(m.viewingTask.ID)
+	if err != nil {
+		m.err = err
+		return
+	}
+	if updatedTask != nil {
+		m.viewingTask = updatedTask
+	}
+
+}
+
+func UpdateViewportWidth(m *Model) {
+	termWidth := utils.TermWidth()
+	termHeight := utils.TermHeight()
+	if m.viewingViewport {
+		m.viewport.Width = termWidth - 14
+		m.viewport.Height = termHeight - 6
+	}
 }

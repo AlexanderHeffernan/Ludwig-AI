@@ -54,9 +54,9 @@ func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				currentLineLength = 0
 			} else {
 				currentLineLength++
-				if currentLineLength >= width {
+				if currentLineLength > width {
 					wrappedLines++
-					currentLineLength = 0
+					currentLineLength = 1
 				}
 			}
 		}

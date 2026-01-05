@@ -13,8 +13,9 @@ func GetTasksAndDisplayKanban(taskStore *storage.FileTaskStorage) {
 		return
 	}
 	DisplayKanban(utils.PointerSliceToValueSlice(tasks))
-} 
+}
 
+/*
 func Execute() {
 	fmt.Println("Starting AI Orchestrator CLI...")
 	taskStore, err := storage.NewFileTaskStorage()
@@ -25,9 +26,10 @@ func Execute() {
 
 	for {
 		GetTasksAndDisplayKanban(taskStore)
-		result := utils.RequestAction(PalleteCommands(taskStore))
+		result := utils.RequestAction(model.PalleteCommands(taskStore))
 		if result == "exit" {
 			break
 		}
 	}
 }
+*/

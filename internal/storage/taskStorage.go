@@ -8,14 +8,14 @@ import (
 	"path/filepath"
 	"sync"
 
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 )
 
 type FileTaskStorage struct {
 	mu       sync.Mutex
 	filePath string
 	// In-memory cache of tasks mapped by their IDs
-	tasks map[string]*types.Task
+	tasks map[string]*task.Task
 }
 
 // NewFileTaskStorage initializes storage and loads tasks from file.
@@ -31,7 +31,7 @@ func NewFileTaskStorage() (*FileTaskStorage, error) {
 	path := filepath.Join(ludwigPath, "tasks.json")
 	storage := &FileTaskStorage{
 		filePath: path,
-		tasks:    make(map[string]*types.Task),
+		tasks:    make(map[string]*task.Task),
 	}
 	if err := storage.load(); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -48,7 +48,7 @@ func (s *FileTaskStorage) load() error {
 		return err
 	}
 	defer file.Close()
-	tasks := make(map[string]*types.Task)
+	tasks := make(map[string]*task.Task)
 	if err := json.NewDecoder(file).Decode(&tasks); err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func lockFileUnlock(f *os.File) error {
 }
 
 // AddTask adds a new task to storage and saves it.
-func (s *FileTaskStorage) AddTask(task *types.Task) error {
+func (s *FileTaskStorage) AddTask(task *task.Task) error {
 	// Reload from disk before adding
 	if err := s.load(); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -112,7 +112,7 @@ func (s *FileTaskStorage) AddTask(task *types.Task) error {
 }
 
 // GetTask retrieves a task by ID.
-func (s *FileTaskStorage) GetTask(id string) (*types.Task, error) {
+func (s *FileTaskStorage) GetTask(id string) (*task.Task, error) {
 	if err := s.load(); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
@@ -126,13 +126,13 @@ func (s *FileTaskStorage) GetTask(id string) (*types.Task, error) {
 }
 
 // ListTasks returns all tasks from storage.
-func (s *FileTaskStorage) ListTasks() ([]*types.Task, error) {
+func (s *FileTaskStorage) ListTasks() ([]*task.Task, error) {
 	if err := s.load(); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	tasks := make([]*types.Task, 0, len(s.tasks))
+	tasks := make([]*task.Task, 0, len(s.tasks))
 	for _, t := range s.tasks {
 		tasks = append(tasks, t)
 	}
@@ -140,7 +140,7 @@ func (s *FileTaskStorage) ListTasks() ([]*types.Task, error) {
 }
 
 // UpdateTask updates an existing task in storage and saves it.
-func (s *FileTaskStorage) UpdateTask(task *types.Task) error {
+func (s *FileTaskStorage) UpdateTask(task *task.Task) error {
 	if err := s.load(); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}

@@ -1,6 +1,9 @@
 package updater
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,18 +11,15 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"archive/tar"
-	"compress/gzip"
-	"archive/zip"
 )
 
 type Release struct {
-	TagName string `json:"tag_name"`
+	TagName string  `json:"tag_name"`
 	Assets  []Asset `json:"assets"`
 }
 
 type Asset struct {
-	Name string `json:"name"`
+	Name        string `json:"name"`
 	DownloadURL string `json:"browser_download_url"`
 }
 
@@ -266,6 +266,8 @@ func getOSAndArch() (string, string) {
 		os = "Darwin"
 	case "linux":
 		os = "Linux"
+	case "windows":
+		os = "Windows"
 	default:
 		os = runtime.GOOS
 	}

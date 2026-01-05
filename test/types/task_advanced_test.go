@@ -4,26 +4,26 @@ import (
 	"testing"
 	"time"
 
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 )
 
 // Test PrintTasks function
 func TestPrintTasks(t *testing.T) {
-	tasks := []types.Task{
+	tasks := []task.Task{
 		{
 			ID:     "1",
 			Name:   "Task 1",
-			Status: types.Pending,
+			Status: task.Pending,
 		},
 		{
 			ID:     "2",
 			Name:   "Task 2",
-			Status: types.InProgress,
+			Status: task.InProgress,
 		},
 		{
 			ID:     "3",
 			Name:   "Task 3",
-			Status: types.Completed,
+			Status: task.Completed,
 		},
 	}
 
@@ -34,7 +34,7 @@ func TestPrintTasks(t *testing.T) {
 		}
 	}()
 
-	types.PrintTasks(tasks)
+	task.PrintTasks(tasks)
 }
 
 // Test PrintTasks with empty list
@@ -45,25 +45,25 @@ func TestPrintTasksEmpty(t *testing.T) {
 		}
 	}()
 
-	types.PrintTasks([]types.Task{})
+	task.PrintTasks([]task.Task{})
 }
 
 // Test StatusString with all statuses
 func TestStatusStringAllStatuses(t *testing.T) {
 	testCases := []struct {
-		status   types.Status
+		status   task.Status
 		expected string
 	}{
-		{types.Pending, "Pending"},
-		{types.InProgress, "In Progress"},
-		{types.NeedsReview, "In Review"},
-		{types.Completed, "Completed"},
+		{task.Pending, "Pending"},
+		{task.InProgress, "In Progress"},
+		{task.NeedsReview, "In Review"},
+		{task.Completed, "Completed"},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.expected, func(t *testing.T) {
-			task := types.Task{Status: tc.status}
-			result := types.StatusString(task)
+			testTask := task.Task{Status: tc.status}
+			result := task.StatusString(testTask)
 			if result != tc.expected {
 				t.Errorf("expected %q, got %q", tc.expected, result)
 			}
@@ -74,22 +74,22 @@ func TestStatusStringAllStatuses(t *testing.T) {
 // Test Task with all fields populated
 func TestTaskFullyPopulated(t *testing.T) {
 	now := time.Now()
-	task := types.Task{
+	testTask := task.Task{
 		ID:         "full-task",
 		Name:       "Full Task",
-		Status:     types.InProgress,
+		Status:     task.InProgress,
 		BranchName: "feature/test",
 		WorkInProgress: "Some progress",
-		Review: &types.ReviewRequest{
+		Review: &task.ReviewRequest{
 			Question:  "Continue?",
 			Context:   "Need decision",
 			CreatedAt: now,
-			Options: []types.ReviewOption{
+			Options: []task.ReviewOption{
 				{ID: "y", Label: "Yes"},
 				{ID: "n", Label: "No"},
 			},
 		},
-		ReviewResponse: &types.ReviewResponse{
+		ReviewResponse: &task.ReviewResponse{
 			ChosenOptionID: "y",
 			ChosenLabel:    "Yes",
 			UserNotes:      "Good approach",
@@ -98,29 +98,29 @@ func TestTaskFullyPopulated(t *testing.T) {
 		ResponseFile: "responses/file.md",
 	}
 
-	if task.ID != "full-task" {
+	if testTask.ID != "full-task" {
 		t.Errorf("ID not set")
 	}
-	if task.Name != "Full Task" {
+	if testTask.Name != "Full Task" {
 		t.Errorf("Name not set")
 	}
-	if task.BranchName != "feature/test" {
+	if testTask.BranchName != "feature/test" {
 		t.Errorf("BranchName not set")
 	}
-	if task.Review == nil {
+	if testTask.Review == nil {
 		t.Errorf("Review not set")
 	}
-	if task.ReviewResponse == nil {
+	if testTask.ReviewResponse == nil {
 		t.Errorf("ReviewResponse not set")
 	}
-	if task.ResponseFile != "responses/file.md" {
+	if testTask.ResponseFile != "responses/file.md" {
 		t.Errorf("ResponseFile not set")
 	}
 }
 
 // Test ReviewOption structure
 func TestReviewOption(t *testing.T) {
-	opt := types.ReviewOption{
+	opt := task.ReviewOption{
 		ID:    "opt-1",
 		Label: "Option Label",
 	}
@@ -135,9 +135,9 @@ func TestReviewOption(t *testing.T) {
 
 // Test ReviewRequest with empty options
 func TestReviewRequestEmptyOptions(t *testing.T) {
-	req := types.ReviewRequest{
+	req := task.ReviewRequest{
 		Question: "Question",
-		Options:  []types.ReviewOption{},
+		Options:  []task.ReviewOption{},
 	}
 
 	if len(req.Options) != 0 {
@@ -147,15 +147,15 @@ func TestReviewRequestEmptyOptions(t *testing.T) {
 
 // Test ReviewRequest with many options
 func TestReviewRequestManyOptions(t *testing.T) {
-	options := make([]types.ReviewOption, 10)
+	options := make([]task.ReviewOption, 10)
 	for i := 0; i < 10; i++ {
-		options[i] = types.ReviewOption{
+		options[i] = task.ReviewOption{
 			ID:    string(rune(i)),
 			Label: "Option",
 		}
 	}
 
-	req := types.ReviewRequest{
+	req := task.ReviewRequest{
 		Question: "Choose?",
 		Options:  options,
 	}
@@ -168,7 +168,7 @@ func TestReviewRequestManyOptions(t *testing.T) {
 // Test ReviewResponse timestamps
 func TestReviewResponseTimestamps(t *testing.T) {
 	now := time.Now()
-	resp := types.ReviewResponse{
+	resp := task.ReviewResponse{
 		ChosenOptionID: "a",
 		ChosenLabel:    "Option A",
 		UserNotes:      "Notes",
@@ -187,7 +187,7 @@ func TestReviewResponseTimestamps(t *testing.T) {
 // Test ReviewRequest timestamps
 func TestReviewRequestTimestamps(t *testing.T) {
 	now := time.Now()
-	req := types.ReviewRequest{
+	req := task.ReviewRequest{
 		Question:  "Q",
 		CreatedAt: now,
 	}
@@ -203,21 +203,21 @@ func TestReviewRequestTimestamps(t *testing.T) {
 
 // Test Task status transitions
 func TestTaskStatusTransitions(t *testing.T) {
-	task := types.Task{
+	testTask := task.Task{
 		ID:     "transit",
 		Name:   "Transition test",
-		Status: types.Pending,
+		Status: task.Pending,
 	}
 
-	transitions := []types.Status{
-		types.InProgress,
-		types.NeedsReview,
-		types.Completed,
+	transitions := []task.Status{
+		task.InProgress,
+		task.NeedsReview,
+		task.Completed,
 	}
 
 	for i, newStatus := range transitions {
-		task.Status = newStatus
-		result := types.StatusString(task)
+		testTask.Status = newStatus
+		result := task.StatusString(testTask)
 		if result == "Unknown" {
 			t.Errorf("transition %d: status became unknown", i)
 		}
@@ -226,8 +226,8 @@ func TestTaskStatusTransitions(t *testing.T) {
 
 // Test ExampleTasks independence
 func TestExampleTasksIndependence(t *testing.T) {
-	tasks1 := types.ExampleTasks()
-	tasks2 := types.ExampleTasks()
+	tasks1 := task.ExampleTasks()
+	tasks2 := task.ExampleTasks()
 
 	// Modify first list
 	tasks1[0].Name = "Modified"
@@ -240,38 +240,38 @@ func TestExampleTasksIndependence(t *testing.T) {
 
 // Test task with nil review
 func TestTaskWithNilReview(t *testing.T) {
-	task := types.Task{
+	testTask := task.Task{
 		ID:     "nil-review",
 		Name:   "No review",
-		Status: types.Completed,
+		Status: task.Completed,
 		Review: nil,
 	}
 
-	if task.Review != nil {
+	if testTask.Review != nil {
 		t.Errorf("review should be nil")
 	}
 }
 
 // Test task with nil review response
 func TestTaskWithNilReviewResponse(t *testing.T) {
-	task := types.Task{
+	testTask := task.Task{
 		ID:             "nil-response",
 		Name:           "No response",
-		Status:         types.Pending,
+		Status:         task.Pending,
 		ReviewResponse: nil,
 	}
 
-	if task.ReviewResponse != nil {
+	if testTask.ReviewResponse != nil {
 		t.Errorf("review response should be nil")
 	}
 }
 
 // Test ReviewRequest context
 func TestReviewRequestContext(t *testing.T) {
-	req := types.ReviewRequest{
+	req := task.ReviewRequest{
 		Question: "Question?",
 		Context:  "This is the context for the question",
-		Options: []types.ReviewOption{
+		Options: []task.ReviewOption{
 			{ID: "a", Label: "Option A"},
 		},
 	}
@@ -284,7 +284,7 @@ func TestReviewRequestContext(t *testing.T) {
 // Test ReviewResponse user notes
 func TestReviewResponseUserNotes(t *testing.T) {
 	notes := "User provided these detailed notes about their choice"
-	resp := types.ReviewResponse{
+	resp := task.ReviewResponse{
 		ChosenOptionID: "a",
 		ChosenLabel:    "Option A",
 		UserNotes:      notes,
@@ -297,7 +297,7 @@ func TestReviewResponseUserNotes(t *testing.T) {
 
 // Test ReviewResponse with empty notes
 func TestReviewResponseEmptyNotes(t *testing.T) {
-	resp := types.ReviewResponse{
+	resp := task.ReviewResponse{
 		ChosenOptionID: "a",
 		ChosenLabel:    "Option A",
 		UserNotes:      "",
@@ -312,14 +312,14 @@ func TestReviewResponseEmptyNotes(t *testing.T) {
 func TestTaskWorkInProgress(t *testing.T) {
 	wip := "✓ Created auth module\n✓ Added JWT support\n• Pending: Rate limiting"
 	
-	task := types.Task{
+	testTask := task.Task{
 		ID:             "wip-task",
 		Name:           "Implementation",
-		Status:         types.NeedsReview,
+		Status:         task.NeedsReview,
 		WorkInProgress: wip,
 	}
 
-	if task.WorkInProgress != wip {
+	if testTask.WorkInProgress != wip {
 		t.Errorf("work in progress not set correctly")
 	}
 }
@@ -328,14 +328,14 @@ func TestTaskWorkInProgress(t *testing.T) {
 func TestTaskBranchName(t *testing.T) {
 	branchName := "feature/user-auth-system"
 	
-	task := types.Task{
+	testTask := task.Task{
 		ID:         "branch-task",
 		Name:       "Add auth",
-		Status:     types.InProgress,
+		Status:     task.InProgress,
 		BranchName: branchName,
 	}
 
-	if task.BranchName != branchName {
+	if testTask.BranchName != branchName {
 		t.Errorf("branch name not set correctly")
 	}
 }
@@ -344,21 +344,21 @@ func TestTaskBranchName(t *testing.T) {
 func TestTaskResponseFile(t *testing.T) {
 	responseFile := "responses/task-123-20240101-120000.md"
 	
-	task := types.Task{
+	testTask := task.Task{
 		ID:           "resp-task",
 		Name:         "Task with response",
-		Status:       types.Completed,
+		Status:       task.Completed,
 		ResponseFile: responseFile,
 	}
 
-	if task.ResponseFile != responseFile {
+	if testTask.ResponseFile != responseFile {
 		t.Errorf("response file not set correctly")
 	}
 }
 
 // Test multiple ReviewOptions in sequence
 func TestMultipleReviewOptions(t *testing.T) {
-	options := []types.ReviewOption{
+	options := []task.ReviewOption{
 		{ID: "opt1", Label: "First option"},
 		{ID: "opt2", Label: "Second option"},
 		{ID: "opt3", Label: "Third option"},

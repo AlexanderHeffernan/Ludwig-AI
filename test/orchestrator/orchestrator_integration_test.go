@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"ludwig/internal/orchestrator"
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 )
 
 // Test orchestrator lifecycle
@@ -245,21 +245,21 @@ func TestPromptWithUserNotes(t *testing.T) {
 
 // Test tasks of different statuses
 func TestTaskStatusHandling(t *testing.T) {
-	statuses := []types.Status{
-		types.Pending,
-		types.InProgress,
-		types.NeedsReview,
-		types.Completed,
+	statuses := []task.Status{
+		task.Pending,
+		task.InProgress,
+		task.NeedsReview,
+		task.Completed,
 	}
 
 	for _, status := range statuses {
-		task := types.Task{
+		testTask := task.Task{
 			ID:     "task-1",
 			Name:   "Test",
 			Status: status,
 		}
 
-		statusStr := types.StatusString(task)
+		statusStr := task.StatusString(testTask)
 		if statusStr == "Unknown" {
 			t.Errorf("status %d should have valid string representation", status)
 		}

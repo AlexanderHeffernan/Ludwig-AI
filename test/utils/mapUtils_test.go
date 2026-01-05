@@ -3,7 +3,7 @@ package utils_test
 import (
 	"testing"
 
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 	"ludwig/internal/utils"
 )
 
@@ -15,15 +15,15 @@ func TestPointerSliceToValueSlice(t *testing.T) {
 	}
 
 	// Test with empty slice
-	result = utils.PointerSliceToValueSlice([]*types.Task{})
+	result = utils.PointerSliceToValueSlice([]*task.Task{})
 	if len(result) != 0 {
 		t.Errorf("expected empty slice, got %v", result)
 	}
 
 	// Test with valid tasks
-	task1 := &types.Task{ID: "1"}
-	task2 := &types.Task{ID: "2"}
-	result = utils.PointerSliceToValueSlice([]*types.Task{task1, task2})
+	task1 := &task.Task{ID: "1"}
+	task2 := &task.Task{ID: "2"}
+	result = utils.PointerSliceToValueSlice([]*task.Task{task1, task2})
 	if len(result) != 2 {
 		t.Errorf("expected 2 tasks, got %d", len(result))
 	}

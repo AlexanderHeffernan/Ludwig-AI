@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"ludwig/internal/storage"
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 )
 
 func cleanupTestStorage(t *testing.T) {
@@ -47,13 +47,13 @@ func TestAddAndGetTask(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	task := &types.Task{
+	testTask := &task.Task{
 		ID:     "task-1",
 		Name:   "Test Task",
-		Status: types.Pending,
+		Status: task.Pending,
 	}
 
-	if err := s.AddTask(task); err != nil {
+	if err := s.AddTask(testTask); err != nil {
 		t.Fatalf("failed to add task: %v", err)
 	}
 
@@ -88,14 +88,14 @@ func TestListTasks(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	tasks := []*types.Task{
-		{ID: "1", Name: "Task 1", Status: types.Pending},
-		{ID: "2", Name: "Task 2", Status: types.InProgress},
-		{ID: "3", Name: "Task 3", Status: types.Completed},
+	tasks := []*task.Task{
+		{ID: "1", Name: "Task 1", Status: task.Pending},
+		{ID: "2", Name: "Task 2", Status: task.InProgress},
+		{ID: "3", Name: "Task 3", Status: task.Completed},
 	}
 
-	for _, task := range tasks {
-		if err := s.AddTask(task); err != nil {
+	for _, taskItem := range tasks {
+		if err := s.AddTask(taskItem); err != nil {
 			t.Fatalf("failed to add task: %v", err)
 		}
 	}
@@ -116,18 +116,18 @@ func TestUpdateTask(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	task := &types.Task{
+	testTask := &task.Task{
 		ID:     "task-1",
 		Name:   "Original Name",
-		Status: types.Pending,
+		Status: task.Pending,
 	}
 
-	s.AddTask(task)
+	s.AddTask(testTask)
 
-	updated := &types.Task{
+	updated := &task.Task{
 		ID:     "task-1",
 		Name:   "Updated Name",
-		Status: types.InProgress,
+		Status: task.InProgress,
 	}
 
 	if err := s.UpdateTask(updated); err != nil {
@@ -138,7 +138,7 @@ func TestUpdateTask(t *testing.T) {
 	if retrieved.Name != "Updated Name" {
 		t.Errorf("expected name 'Updated Name', got %s", retrieved.Name)
 	}
-	if retrieved.Status != types.InProgress {
+	if retrieved.Status != task.InProgress {
 		t.Errorf("expected status InProgress, got %v", retrieved.Status)
 	}
 }
@@ -149,9 +149,9 @@ func TestUpdateTaskNotFound(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	task := &types.Task{ID: "nonexistent", Name: "Test"}
+	testTask := &task.Task{ID: "nonexistent", Name: "Test"}
 
-	err := s.UpdateTask(task)
+	err := s.UpdateTask(testTask)
 	if err == nil {
 		t.Errorf("expected error updating nonexistent task, got nil")
 	}
@@ -163,13 +163,13 @@ func TestDeleteTask(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	task := &types.Task{
+	testTask := &task.Task{
 		ID:     "task-1",
 		Name:   "Test Task",
-		Status: types.Pending,
+		Status: task.Pending,
 	}
 
-	s.AddTask(task)
+	s.AddTask(testTask)
 
 	if err := s.DeleteTask("task-1"); err != nil {
 		t.Fatalf("failed to delete task: %v", err)
@@ -199,12 +199,12 @@ func TestTaskPersistence(t *testing.T) {
 
 	// Create first storage instance and add task
 	s1, _ := storage.NewFileTaskStorage()
-	task := &types.Task{
+	testTask := &task.Task{
 		ID:     "persist-test",
 		Name:   "Persistence Test",
-		Status: types.InProgress,
+		Status: task.InProgress,
 	}
-	s1.AddTask(task)
+	s1.AddTask(testTask)
 
 	// Create new storage instance and verify task is loaded
 	s2, _ := storage.NewFileTaskStorage()
@@ -224,13 +224,13 @@ func TestTaskJSONFormat(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	task := &types.Task{
+	testTask := &task.Task{
 		ID:     "format-test",
 		Name:   "Format Test",
-		Status: types.Completed,
+		Status: task.Completed,
 	}
 
-	s.AddTask(task)
+	s.AddTask(testTask)
 
 	// Read the JSON file directly
 	cwd, _ := os.Getwd()
@@ -240,7 +240,7 @@ func TestTaskJSONFormat(t *testing.T) {
 		t.Fatalf("failed to read task file: %v", err)
 	}
 
-	var tasks map[string]*types.Task
+	var tasks map[string]*task.Task
 	if err := json.Unmarshal(data, &tasks); err != nil {
 		t.Fatalf("failed to unmarshal JSON: %v", err)
 	}

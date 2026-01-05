@@ -1,33 +1,34 @@
-package cli
+package model
+
 import (
 	"ludwig/internal/utils"
-	//"fmt"
-	"ludwig/internal/types"
 	"ludwig/internal/storage"
-	"github.com/google/uuid"
-	"strings"
+	"ludwig/internal/types/task"
 	"ludwig/internal/orchestrator"
+
+	"strings"
+	"time"
 	"strconv"
 	"os"
-	"time"
+
+	"github.com/google/uuid"
+	"github.com/charmbracelet/bubbles/table"
 )
 
-const PADDING string = "\n  "
-
-func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
-	actions := []utils.Command {
+func PalleteCommands(taskStore *storage.FileTaskStorage) []Command {
+	actions := []Command {
 		{
 			Text: "add",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if !checkArgumentsCountMin(2, parts, true) {
 					return "Usage: add <task description> - Add a new task. Tasks can be multiple words. No quotation marks needed."
 				}
 
 				// skip the first part which is the command itself
-				newTask := &types.Task{
+				newTask := &task.Task{
 					Name: strings.Join(parts[1:], " "),
-					Status: types.Pending,
+					Status: task.Pending,
 					ID: uuid.New().String(),
 					CreatedAt: time.Now(),
 				}
@@ -43,7 +44,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 		{
 			Text: "delete",
 			Description: "delete <task ref> - Delete a task by it's ref, can be seen to the left of the task name on the kanban. Do not include the # symbol.",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if !checkArgumentsCount(2, parts) {
 					return "Usage: delete <task ref> - Delete a task by it's ref, can be seen to the left of the task name on the kanban."
@@ -55,7 +56,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 				
 				tasksPointers, err := taskStore.ListTasks()
 				if err != nil {
-					return PADDING + "Error retrieving tasks: " + err.Error()
+					return "Error retrieving tasks: " + err.Error()
 				}
 
 				tasks := utils.PointerSliceToValueSlice(tasksPointers)
@@ -72,7 +73,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 		},
 		{
 			Text: "start",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if !checkArgumentsCount(1, parts) {
 					return "Usage: start method takes no arguments"
@@ -84,7 +85,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 		},
 		{
 			Text: "stop",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if len(parts) > 1 {
 					//utils.Println("Usage: stop method takes no arguments")
@@ -99,7 +100,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 		{
 			Text: "clear",
 			Description: "clear - Clear the command line so that only the kanban board is visible",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if !checkArgumentsCount(1, parts) {
 					return  "Usage: clear method takes no arguments"
@@ -110,7 +111,7 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 		{
 			Text: "exit",
 			Description: "exit - Exit the CLI",
-			Action: func(text string) string {
+			Action: func(text string, m *Model) string {
 				parts := strings.Fields(text)
 				if !checkArgumentsCount(1, parts) {
 					return "Usage: exit method takes no arguments"
@@ -121,17 +122,51 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []utils.Command {
 				return ""
 			},
 		},
+		{
+			Text: "view",
+			Description: "view <task ref> - View the streamed output log of a task by it's ref. Do not include the # symbol.",
+			Action: func(text string, m *Model) string {
+				parts := strings.Fields(text)
+				if !checkArgumentsCount(2, parts) {
+					return "Usage: view command takes 1 argument: <task ref>"
+				}
+
+				taskIndex, err := strconv.Atoi(parts[1])
+				if err != nil {
+					return "Invalid task ref. Must be a number."
+				}
+				
+				tasksPointers, err := taskStore.ListTasks()
+				if err != nil {
+					return "Error retrieving tasks: " + err.Error()
+				}
+
+				tasks := utils.PointerSliceToValueSlice(tasksPointers)
+
+				if taskIndex < 0 || taskIndex >= len(tasks) {
+					return "Task ref out of range."
+				}
+				taskToView := tasks[taskIndex]
+				filePath := "./.ludwig/" + taskToView.ResponseFile
+
+				m.viewingViewport = true
+				m.taskViewport = *m.taskViewport.SetViewingTask(&taskToView, filePath)
+				m.taskViewport.ViewportUpdateLoop()
+
+				return ""
+			},
+		},
 	}
-	return append(actions, utils.Command {
+	return append(actions, Command {
 		Text: "help",
 		Description: "help - Show this help message",
-		Action: func(text string) string {
+		Action: func(text string, m *Model) string {
 			parts := strings.Fields(text)
 			if !checkArgumentsCount(1, parts) {
 				return "Usage: help method takes no arguments"
 			}
 			//utils.PrintHelp(actions)
-			return utils.PrintHelpTable(actions)
+			return PrintHelpTable(actions)
 		},
 	})
 }
@@ -147,4 +182,36 @@ func checkArgumentsCountMin(expected int, parts []string, canHaveMore bool) bool
 		return false
 	}
 	return true
+}
+
+func PrintHelpTable(actions []Command) string {
+	columns := []table.Column {
+		{Title: "Command", Width: 20},
+		{Title: "Description", Width: 200},
+	}
+	rows := genHelpTableRows(actions)
+	t := tableOptions(columns, rows)
+
+	return t.View()
+}
+
+func genHelpTableRows(actions []Command) []table.Row {
+	var rows []table.Row
+	for _, cmd := range actions {
+		rows = append(rows, table.Row{cmd.Text, cmd.Description})
+	}
+	rows = append(rows, table.Row{"help", "Show this help message"})
+	return rows
+}
+
+func tableOptions(columns []table.Column, rows []table.Row) table.Model {
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(false),
+	)
+	s := table.DefaultStyles()
+	s.Selected = s.Cell.Padding(0,0).Margin(0,0)
+	t.SetStyles(s)
+	return t
 }

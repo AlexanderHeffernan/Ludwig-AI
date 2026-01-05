@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"ludwig/internal/orchestrator"
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 	"time"
 )
 
@@ -131,9 +131,9 @@ func TestBuildTaskPromptIncludesSystemInstructions(t *testing.T) {
 func TestReviewRequestCreation(t *testing.T) {
 	now := time.Now()
 	
-	review := &types.ReviewRequest{
+	review := &task.ReviewRequest{
 		Question: "Which approach?",
-		Options: []types.ReviewOption{
+		Options: []task.ReviewOption{
 			{ID: "opt1", Label: "Approach 1"},
 			{ID: "opt2", Label: "Approach 2"},
 		},
@@ -159,7 +159,7 @@ func TestReviewRequestCreation(t *testing.T) {
 func TestReviewResponseCreation(t *testing.T) {
 	now := time.Now()
 	
-	response := &types.ReviewResponse{
+	response := &task.ReviewResponse{
 		ChosenOptionID: "opt1",
 		ChosenLabel:    "Approach 1",
 		UserNotes:      "This is better",
@@ -182,47 +182,47 @@ func TestReviewResponseCreation(t *testing.T) {
 
 // Test task with review workflow
 func TestTaskWithReviewWorkflow(t *testing.T) {
-	task := &types.Task{
+	testTask := &task.Task{
 		ID:     "task-1",
 		Name:   "Implement feature",
-		Status: types.NeedsReview,
-		Review: &types.ReviewRequest{
+		Status: task.NeedsReview,
+		Review: &task.ReviewRequest{
 			Question: "Design decision?",
-			Options: []types.ReviewOption{
+			Options: []task.ReviewOption{
 				{ID: "a", Label: "Option A"},
 				{ID: "b", Label: "Option B"},
 			},
 		},
 	}
 
-	if task.Status != types.NeedsReview {
+	if testTask.Status != task.NeedsReview {
 		t.Errorf("task status not set to NeedsReview")
 	}
-	if task.Review == nil {
+	if testTask.Review == nil {
 		t.Errorf("task review not attached")
 	}
-	if len(task.Review.Options) != 2 {
+	if len(testTask.Review.Options) != 2 {
 		t.Errorf("review options not correct")
 	}
 }
 
 // Test task with review response
 func TestTaskWithReviewResponse(t *testing.T) {
-	task := &types.Task{
+	testTask := &task.Task{
 		ID:     "task-1",
 		Name:   "Implement feature",
-		Status: types.NeedsReview,
-		ReviewResponse: &types.ReviewResponse{
+		Status: task.NeedsReview,
+		ReviewResponse: &task.ReviewResponse{
 			ChosenOptionID: "a",
 			ChosenLabel:    "Option A",
 			UserNotes:      "Preferred for performance",
 		},
 	}
 
-	if task.ReviewResponse == nil {
+	if testTask.ReviewResponse == nil {
 		t.Errorf("task review response not attached")
 	}
-	if task.ReviewResponse.ChosenLabel != "Option A" {
+	if testTask.ReviewResponse.ChosenLabel != "Option A" {
 		t.Errorf("chosen label not correct")
 	}
 }

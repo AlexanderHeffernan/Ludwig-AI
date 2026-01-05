@@ -3,46 +3,46 @@ package types_test
 import (
 	"testing"
 
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 )
 
 func TestStatusString(t *testing.T) {
 	tests := []struct {
 		name     string
-		status   types.Status
+		status   task.Status
 		expected string
 	}{
 		{
 			name:     "Pending status",
-			status:   types.Pending,
+			status:   task.Pending,
 			expected: "Pending",
 		},
 		{
 			name:     "InProgress status",
-			status:   types.InProgress,
+			status:   task.InProgress,
 			expected: "In Progress",
 		},
 		{
 			name:     "NeedsReview_status",
-			status:   types.NeedsReview,
+			status:   task.NeedsReview,
 			expected: "In Review",
 		},
 		{
 			name:     "Completed status",
-			status:   types.Completed,
+			status:   task.Completed,
 			expected: "Completed",
 		},
 		{
 			name:     "Invalid status",
-			status:   types.Status(999),
+			status:   task.Status(999),
 			expected: "Unknown",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			task := types.Task{Status: tt.status}
-			result := types.StatusString(task)
+			testTask := task.Task{Status: tt.status}
+			result := task.StatusString(testTask)
 			if result != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, result)
 			}
@@ -51,7 +51,7 @@ func TestStatusString(t *testing.T) {
 }
 
 func TestExampleTasks(t *testing.T) {
-	tasks := types.ExampleTasks()
+	tasks := task.ExampleTasks()
 
 	if len(tasks) != 3 {
 		t.Errorf("expected 3 tasks, got %d", len(tasks))
@@ -71,35 +71,35 @@ func TestExampleTasks(t *testing.T) {
 		}
 	}
 
-	for i, task := range tasks {
-		if task.Status != types.Pending {
-			t.Errorf("task %d: expected status Pending, got %v", i, task.Status)
+	for i, taskItem := range tasks {
+		if taskItem.Status != task.Pending {
+			t.Errorf("task %d: expected status Pending, got %v", i, taskItem.Status)
 		}
 	}
 }
 
 func TestTaskCreation(t *testing.T) {
-	task := types.Task{
+	testTask := task.Task{
 		ID:     "test-1",
 		Name:   "Test Task",
-		Status: types.InProgress,
+		Status: task.InProgress,
 	}
 
-	if task.ID != "test-1" {
-		t.Errorf("expected ID test-1, got %s", task.ID)
+	if testTask.ID != "test-1" {
+		t.Errorf("expected ID test-1, got %s", testTask.ID)
 	}
-	if task.Name != "Test Task" {
-		t.Errorf("expected name 'Test Task', got %s", task.Name)
+	if testTask.Name != "Test Task" {
+		t.Errorf("expected name 'Test Task', got %s", testTask.Name)
 	}
-	if task.Status != types.InProgress {
-		t.Errorf("expected status InProgress, got %v", task.Status)
+	if testTask.Status != task.InProgress {
+		t.Errorf("expected status InProgress, got %v", testTask.Status)
 	}
 }
 
 func TestReviewRequest(t *testing.T) {
-	req := types.ReviewRequest{
+	req := task.ReviewRequest{
 		Question: "Should we refactor this?",
-		Options: []types.ReviewOption{
+		Options: []task.ReviewOption{
 			{ID: "yes", Label: "Yes, proceed"},
 			{ID: "no", Label: "No, keep as is"},
 		},
@@ -114,18 +114,18 @@ func TestReviewRequest(t *testing.T) {
 }
 
 func TestTaskWithWorktreePath(t *testing.T) {
-	task := types.Task{
+	testTask := task.Task{
 		ID:           "test-1",
 		Name:         "Test Task",
-		Status:       types.InProgress,
+		Status:       task.InProgress,
 		BranchName:   "ludwig/test-task",
 		WorktreePath: "/repo/.worktrees/test-1",
 	}
 
-	if task.WorktreePath != "/repo/.worktrees/test-1" {
-		t.Errorf("expected worktree path /repo/.worktrees/test-1, got %s", task.WorktreePath)
+	if testTask.WorktreePath != "/repo/.worktrees/test-1" {
+		t.Errorf("expected worktree path /repo/.worktrees/test-1, got %s", testTask.WorktreePath)
 	}
-	if task.BranchName != "ludwig/test-task" {
-		t.Errorf("expected branch name ludwig/test-task, got %s", task.BranchName)
+	if testTask.BranchName != "ludwig/test-task" {
+		t.Errorf("expected branch name ludwig/test-task, got %s", testTask.BranchName)
 	}
 }

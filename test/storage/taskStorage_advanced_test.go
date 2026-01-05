@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"ludwig/internal/storage"
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 )
 
 // Test sequential writes (simulating task operations)
@@ -19,12 +19,12 @@ func TestTaskStorageSequentialWrites(t *testing.T) {
 	numTasks := 5
 
 	for i := 1; i <= numTasks; i++ {
-		task := &types.Task{
+		testTask := &task.Task{
 			ID:     string(rune(i)),
 			Name:   "Task " + string(rune(i)),
-			Status: types.Pending,
+			Status: task.Pending,
 		}
-		if err := s.AddTask(task); err != nil {
+		if err := s.AddTask(testTask); err != nil {
 			t.Errorf("failed to add task: %v", err)
 		}
 	}
@@ -44,8 +44,8 @@ func TestTaskStorageConcurrentReads(t *testing.T) {
 	s, _ := storage.NewFileTaskStorage()
 
 	// Add some test data first
-	task := &types.Task{ID: "shared-task", Name: "Shared", Status: types.Pending}
-	s.AddTask(task)
+	testTask := &task.Task{ID: "shared-task", Name: "Shared", Status: task.Pending}
+	s.AddTask(testTask)
 
 	var wg sync.WaitGroup
 	numReaders := 10
@@ -79,17 +79,17 @@ func TestTaskStorageUpdateAllFields(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	original := &types.Task{
+	original := &task.Task{
 		ID:     "full-task",
 		Name:   "Original Name",
-		Status: types.Pending,
+		Status: task.Pending,
 	}
 	s.AddTask(original)
 
-	updated := &types.Task{
+	updated := &task.Task{
 		ID:             "full-task",
 		Name:           "Updated Name",
-		Status:         types.Completed,
+		Status:         task.Completed,
 		BranchName:     "feature/new-branch",
 		WorkInProgress: "Some work done",
 		ResponseFile:   "responses/task.md",
@@ -101,7 +101,7 @@ func TestTaskStorageUpdateAllFields(t *testing.T) {
 	if retrieved.Name != "Updated Name" {
 		t.Errorf("name not updated")
 	}
-	if retrieved.Status != types.Completed {
+	if retrieved.Status != task.Completed {
 		t.Errorf("status not updated")
 	}
 	if retrieved.BranchName != "feature/new-branch" {
@@ -122,13 +122,13 @@ func TestTaskStorageWithReviewRequest(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	task := &types.Task{
+	testTask := &task.Task{
 		ID:     "review-task",
 		Name:   "Task needing review",
-		Status: types.NeedsReview,
-		Review: &types.ReviewRequest{
+		Status: task.NeedsReview,
+		Review: &task.ReviewRequest{
 			Question: "Which approach?",
-			Options: []types.ReviewOption{
+			Options: []task.ReviewOption{
 				{ID: "a", Label: "Approach A"},
 				{ID: "b", Label: "Approach B"},
 			},
@@ -136,7 +136,7 @@ func TestTaskStorageWithReviewRequest(t *testing.T) {
 		},
 	}
 
-	s.AddTask(task)
+	s.AddTask(testTask)
 	retrieved, _ := s.GetTask("review-task")
 
 	if retrieved.Review == nil {
@@ -157,18 +157,18 @@ func TestTaskStorageWithReviewResponse(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	task := &types.Task{
+	testTask := &task.Task{
 		ID:     "response-task",
 		Name:   "Task with response",
-		Status: types.Completed,
-		ReviewResponse: &types.ReviewResponse{
+		Status: task.Completed,
+		ReviewResponse: &task.ReviewResponse{
 			ChosenOptionID: "a",
 			ChosenLabel:    "Approach A",
 			UserNotes:      "User preferred this",
 		},
 	}
 
-	s.AddTask(task)
+	s.AddTask(testTask)
 	retrieved, _ := s.GetTask("response-task")
 
 	if retrieved.ReviewResponse == nil {
@@ -189,12 +189,12 @@ func TestTaskStorageLargeDataSet(t *testing.T) {
 
 	// Add many tasks
 	for i := 0; i < numTasks; i++ {
-		task := &types.Task{
+		testTask := &task.Task{
 			ID:     string(rune(i)),
 			Name:   "Task " + string(rune(i)),
-			Status: types.Pending,
+			Status: task.Pending,
 		}
-		s.AddTask(task)
+		s.AddTask(testTask)
 	}
 
 	// Verify all were added
@@ -221,27 +221,27 @@ func TestTaskStorageListTasksMultipleStatus(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	statuses := []types.Status{
-		types.Pending,
-		types.InProgress,
-		types.NeedsReview,
-		types.Completed,
+	statuses := []task.Status{
+		task.Pending,
+		task.InProgress,
+		task.NeedsReview,
+		task.Completed,
 	}
 
 	for i, status := range statuses {
-		task := &types.Task{
+		testTask := &task.Task{
 			ID:     string(rune(i)),
 			Name:   "Task",
 			Status: status,
 		}
-		s.AddTask(task)
+		s.AddTask(testTask)
 	}
 
 	tasks, _ := s.ListTasks()
 
-	statusFound := make(map[types.Status]bool)
-	for _, task := range tasks {
-		statusFound[task.Status] = true
+	statusFound := make(map[task.Status]bool)
+	for _, taskItem := range tasks {
+		statusFound[taskItem.Status] = true
 	}
 
 	for _, status := range statuses {
@@ -258,18 +258,18 @@ func TestTaskFieldsIndependence(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	task1 := &types.Task{
+	task1 := &task.Task{
 		ID:             "task1",
 		Name:           "Task 1",
-		Status:         types.Pending,
+		Status:         task.Pending,
 		BranchName:     "branch1",
 		WorkInProgress: "work1",
 	}
 
-	task2 := &types.Task{
+	task2 := &task.Task{
 		ID:             "task2",
 		Name:           "Task 2",
-		Status:         types.InProgress,
+		Status:         task.InProgress,
 		BranchName:     "branch2",
 		WorkInProgress: "work2",
 	}
@@ -297,12 +297,12 @@ func TestTaskStoragePathHandling(t *testing.T) {
 	expectedPath := filepath.Join(cwd, ".ludwig", "tasks.json")
 
 	s, _ := storage.NewFileTaskStorage()
-	task := &types.Task{
+	testTask := &task.Task{
 		ID:     "test",
 		Name:   "Test",
-		Status: types.Pending,
+		Status: task.Pending,
 	}
-	s.AddTask(task)
+	s.AddTask(testTask)
 
 	// Verify file exists at expected location
 	if _, err := os.Stat(expectedPath); err != nil {
@@ -316,8 +316,8 @@ func TestTaskStorageEmptyListPersistence(t *testing.T) {
 	defer cleanupTestStorage(t)
 
 	s1, _ := storage.NewFileTaskStorage()
-	task := &types.Task{ID: "temp", Name: "Temp", Status: types.Pending}
-	s1.AddTask(task)
+	testTask := &task.Task{ID: "temp", Name: "Temp", Status: task.Pending}
+	s1.AddTask(testTask)
 	s1.DeleteTask("temp")
 
 	// Create new instance
@@ -353,12 +353,12 @@ func TestTaskStorageRapidOperations(t *testing.T) {
 	s, _ := storage.NewFileTaskStorage()
 
 	// Add, update, read in quick succession
-	task := &types.Task{ID: "rapid", Name: "Original", Status: types.Pending}
-	s.AddTask(task)
+	testTask := &task.Task{ID: "rapid", Name: "Original", Status: task.Pending}
+	s.AddTask(testTask)
 
-	task.Name = "Updated"
-	task.Status = types.InProgress
-	s.UpdateTask(task)
+	testTask.Name = "Updated"
+	testTask.Status = task.InProgress
+	s.UpdateTask(testTask)
 
 	retrieved, _ := s.GetTask("rapid")
 	if retrieved.Name != "Updated" {

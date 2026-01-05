@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"ludwig/internal/storage"
-	"ludwig/internal/types"
+	"ludwig/internal/types/task"
 )
 
 // Test helper to cleanup after tests
@@ -47,21 +47,21 @@ func TestGetTasksAndDisplayKanbanWithTasks(t *testing.T) {
 	s, _ := storage.NewFileTaskStorage()
 
 	// Add some test tasks
-	tasks := []*types.Task{
+	tasks := []*task.Task{
 		{
 			ID:     "1",
 			Name:   "Task 1",
-			Status: types.Pending,
+			Status: task.Pending,
 		},
 		{
 			ID:     "2",
 			Name:   "Task 2",
-			Status: types.InProgress,
+			Status: task.InProgress,
 		},
 		{
 			ID:     "3",
 			Name:   "Task 3",
-			Status: types.Completed,
+			Status: task.Completed,
 		},
 	}
 
@@ -81,13 +81,13 @@ func TestGetTasksAndDisplayKanbanWithTasks(t *testing.T) {
 // Test task status enum values used in CLI
 func TestCLITaskStatusValues(t *testing.T) {
 	// Verify status enums are properly initialized
-	if types.Pending != 0 {
+	if task.Pending != 0 {
 		t.Errorf("Pending status should be 0")
 	}
-	if types.InProgress != 1 {
+	if task.InProgress != 1 {
 		t.Errorf("InProgress status should be 1")
 	}
-	if types.Completed != 3 {
+	if task.Completed != 3 {
 		t.Errorf("Completed status should be 3")
 	}
 }
@@ -100,19 +100,19 @@ func TestTaskFilteringByStatus(t *testing.T) {
 	s, _ := storage.NewFileTaskStorage()
 
 	// Add tasks with different statuses
-	statuses := []types.Status{
-		types.Pending,
-		types.InProgress,
-		types.Completed,
+	statuses := []task.Status{
+		task.Pending,
+		task.InProgress,
+		task.Completed,
 	}
 
 	for i, status := range statuses {
-		task := &types.Task{
+		newTask := &task.Task{
 			ID:     string(rune(i)),
 			Name:   "Task",
 			Status: status,
 		}
-		s.AddTask(task)
+		s.AddTask(newTask)
 	}
 
 	// List and manually filter
@@ -122,13 +122,13 @@ func TestTaskFilteringByStatus(t *testing.T) {
 	inProgressCount := 0
 	completedCount := 0
 
-	for _, task := range allTasks {
-		switch task.Status {
-		case types.Pending:
+	for _, taskItem := range allTasks {
+		switch taskItem.Status {
+		case task.Pending:
 			pendingCount++
-		case types.InProgress:
+		case task.InProgress:
 			inProgressCount++
-		case types.Completed:
+		case task.Completed:
 			completedCount++
 		}
 	}
@@ -153,26 +153,26 @@ func TestTaskListUnbalancedStatuses(t *testing.T) {
 
 	// Create unbalanced distribution
 	for i := 0; i < 5; i++ {
-		s.AddTask(&types.Task{
+		s.AddTask(&task.Task{
 			ID:     "p" + string(rune(i)),
 			Name:   "Pending Task",
-			Status: types.Pending,
+			Status: task.Pending,
 		})
 	}
 
 	for i := 0; i < 2; i++ {
-		s.AddTask(&types.Task{
+		s.AddTask(&task.Task{
 			ID:     "i" + string(rune(i)),
 			Name:   "In Progress Task",
-			Status: types.InProgress,
+			Status: task.InProgress,
 		})
 	}
 
 	for i := 0; i < 8; i++ {
-		s.AddTask(&types.Task{
+		s.AddTask(&task.Task{
 			ID:     "c" + string(rune(i)),
 			Name:   "Completed Task",
-			Status: types.Completed,
+			Status: task.Completed,
 		})
 	}
 
@@ -182,13 +182,13 @@ func TestTaskListUnbalancedStatuses(t *testing.T) {
 	inProgressCount := 0
 	completedCount := 0
 
-	for _, task := range tasks {
-		switch task.Status {
-		case types.Pending:
+	for _, taskItem := range tasks {
+		switch taskItem.Status {
+		case task.Pending:
 			pendingCount++
-		case types.InProgress:
+		case task.InProgress:
 			inProgressCount++
-		case types.Completed:
+		case task.Completed:
 			completedCount++
 		}
 	}
@@ -211,13 +211,13 @@ func TestTaskRetrievalForDisplay(t *testing.T) {
 
 	s, _ := storage.NewFileTaskStorage()
 
-	task := &types.Task{
+	testTask := &task.Task{
 		ID:     "display-test",
 		Name:   "Task to Display",
-		Status: types.InProgress,
+		Status: task.InProgress,
 	}
 
-	s.AddTask(task)
+	s.AddTask(testTask)
 
 	// Retrieve and verify
 	retrieved, _ := s.GetTask("display-test")
@@ -225,7 +225,7 @@ func TestTaskRetrievalForDisplay(t *testing.T) {
 	if retrieved.Name != "Task to Display" {
 		t.Errorf("task name not correct for display")
 	}
-	if retrieved.Status != types.InProgress {
+	if retrieved.Status != task.InProgress {
 		t.Errorf("task status not correct for display")
 	}
 }

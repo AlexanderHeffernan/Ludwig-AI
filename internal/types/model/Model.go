@@ -1,46 +1,48 @@
 package model
+
 import (
+	"ludwig/internal/components/commandInput"
+	"ludwig/internal/components/outputViewport"
+	"ludwig/internal/kanban"
 	"ludwig/internal/storage"
 	"ludwig/internal/types/task"
+	"ludwig/internal/updater"
 	"ludwig/internal/utils"
-	"ludwig/internal/kanban"
-	"ludwig/internal/components/outputViewport"
-	"ludwig/internal/components/commandInput"
 
-	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
+	"fmt"
 	"strings"
 	"time"
-	"fmt"
+
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textarea"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type Model struct {
-	taskStore *storage.FileTaskStorage
-	tasks     []task.Task
-	textInput textarea.Model
-	commandInput commandInput.Model
-	commands  []Command
-	err       error
-	message   string
-	taskViewport outputViewport.Model
+	taskStore       *storage.FileTaskStorage
+	tasks           []task.Task
+	textInput       textarea.Model
+	commandInput    commandInput.Model
+	commands        []Command
+	err             error
+	message         string
+	taskViewport    outputViewport.Model
 	viewingViewport bool
 
-
 	/*
-	spinner   spinner.Model
-	viewport  viewport.Model
-	progressBar progressBar.Model
-	filePath  string
-	viewingTask *task.Task
-	fileChangeInfo *utils.FileChangeInfo
+		spinner   spinner.Model
+		viewport  viewport.Model
+		progressBar progressBar.Model
+		filePath  string
+		viewingTask *task.Task
+		fileChangeInfo *utils.FileChangeInfo
 	*/
 }
 
 type Command struct {
-	Text string
-	Action func(Text string, m *Model) string
+	Text        string
+	Action      func(Text string, m *Model) string
 	Description string
 }
 
@@ -49,11 +51,11 @@ type tickMsg time.Time
 
 var loadingStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
 
-func NewModel(taskStore *storage.FileTaskStorage) *Model {
+func NewModel(taskStore *storage.FileTaskStorage, version string) *Model {
 	ti := textarea.New()
 	ti.Placeholder = "...Enter command (e.g., 'add <task>', 'exit', 'help')"
 	ti.SetWidth(utils.TermWidth() - 6) // Account for border padding
-	ti.SetHeight(2) // Start with minimum height
+	ti.SetHeight(2)                    // Start with minimum height
 	ti.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ti.BlurredStyle.CursorLine = lipgloss.NewStyle()
 	ti.ShowLineNumbers = false
@@ -72,12 +74,25 @@ func NewModel(taskStore *storage.FileTaskStorage) *Model {
 	s.Style = loadingStyle
 
 	m := &Model{
-		taskStore: taskStore,
-		tasks:     utils.PointerSliceToValueSlice(tasks),
+		taskStore:    taskStore,
+		tasks:        utils.PointerSliceToValueSlice(tasks),
 		commandInput: commandInput.NewModel(),
 	}
 	m.commands = PalleteCommands(taskStore)
+
+	m.checkForUpdate(version)
+
 	return m
+}
+
+func (m *Model) checkForUpdate(version string) {
+	// Check for updates in the background
+	go func() {
+		isNewer, latestVersion, err := updater.CheckForUpdate(version)
+		if err == nil && isNewer {
+			m.message = fmt.Sprintf("Update available: %s → %s. Exit Ludwig and run 'ludwig --update' to install.", version, latestVersion)
+		}
+	}()
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -102,7 +117,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
-			if !m.viewingViewport { return m, tea.Quit }
+			if !m.viewingViewport {
+				return m, tea.Quit
+			}
 			m.viewingViewport = false
 			return m, nil
 		case tea.KeyEnter:
@@ -167,28 +184,28 @@ func (m *Model) View() string {
 	if m.viewingViewport {
 		return m.taskViewport.View()
 		/*
-		s.WriteString(m.progressBar.View())
-		// Render full screen output view
-		bubbleStyle := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			Width(utils.TermWidth() - 5).
-			Height(utils.TermHeight() - 8).
-			BorderForeground(lipgloss.Color("62")).
-			Padding(0, 1).
-			Margin(1, 1)
+			s.WriteString(m.progressBar.View())
+			// Render full screen output view
+			bubbleStyle := lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				Width(utils.TermWidth() - 5).
+				Height(utils.TermHeight() - 8).
+				BorderForeground(lipgloss.Color("62")).
+				Padding(0, 1).
+				Margin(1, 1)
 
-		spinnerOn := m.viewingTask.Status == task.InProgress && orchestrator.IsRunning()
+			spinnerOn := m.viewingTask.Status == task.InProgress && orchestrator.IsRunning()
 
-		insideBubble := strings.Builder{}
-		insideBubble.WriteString(m.viewport.View())
-		if spinnerOn {
-			utils.DebugLog("Rendering spinner in viewport view")
-			insideBubble.WriteString("\n" + m.spinner.View() + loadingStyle.Render(" Working on it"))
-		}
+			insideBubble := strings.Builder{}
+			insideBubble.WriteString(m.viewport.View())
+			if spinnerOn {
+				utils.DebugLog("Rendering spinner in viewport view")
+				insideBubble.WriteString("\n" + m.spinner.View() + loadingStyle.Render(" Working on it"))
+			}
 
-		s.WriteString(bubbleStyle.Render(insideBubble.String()))
-		s.WriteString(VIEWPORT_CONTROLS)
-		return s.String()
+			s.WriteString(bubbleStyle.Render(insideBubble.String()))
+			s.WriteString(VIEWPORT_CONTROLS)
+			return s.String()
 		*/
 	}
 	// Render the Kanban board.
@@ -221,7 +238,6 @@ func (m *Model) View() string {
 	return s.String()
 }
 
-
 func (m *Model) UpdateTasks() {
 	tasks, err := m.taskStore.ListTasks()
 	if err != nil {
@@ -230,7 +246,9 @@ func (m *Model) UpdateTasks() {
 		m.tasks = utils.PointerSliceToValueSlice(tasks)
 	}
 
-	if m.taskViewport.ViewingTask == nil { return }
+	if m.taskViewport.ViewingTask == nil {
+		return
+	}
 	// Refresh the viewing task details if in viewport mode
 	updatedTask, err := m.taskStore.GetTask(m.taskViewport.ViewingTask.ID)
 	if err != nil {
@@ -242,4 +260,3 @@ func (m *Model) UpdateTasks() {
 	}
 
 }
-

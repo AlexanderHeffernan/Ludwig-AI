@@ -2,6 +2,47 @@
 
 Ludwig is an AI-powered task orchestrator that automates project work through integrated AI clients (Gemini, Ollama, or GitHub Copilot CLI). It manages task execution, git workflows, and human review cycles through a command-line interface. Works online with Gemini/Copilot or completely offline with Ollama.
 
+## Installation
+
+### Quick Install (Recommended)
+
+#### macOS & Linux
+
+Copy and paste this command into your terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AlexanderHeffernan/Ludwig-AI/main/install.sh | bash
+```
+
+#### Windows
+
+Run this command in PowerShell (as Administrator for system-wide install):
+
+```powershell
+powershell -Command "& {[ScriptBlock]::Create((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/AlexanderHeffernan/Ludwig-AI/main/install.ps1')).Invoke()}"
+```
+
+That's it! Ludwig will be installed to `/usr/local/bin/` (macOS/Linux) or `C:\Program Files\Ludwig` (Windows) and ready to use globally.
+
+### Build from Source
+
+```bash
+git clone https://github.com/AlexanderHeffernan/Ludwig-AI.git
+cd Ludwig-AI
+go build -o ludwig ./cmd/main.go
+sudo mv ludwig /usr/local/bin/
+```
+
+### Update
+
+Ludwig includes automatic updates. To check for and install a new version:
+
+```bash
+ludwig --update
+```
+
+Then restart Ludwig to apply the update.
+
 ## Project Structure
 
 ```

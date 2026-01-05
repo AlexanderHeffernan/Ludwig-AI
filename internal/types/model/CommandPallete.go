@@ -5,7 +5,7 @@ import (
 	"ludwig/internal/storage"
 	"ludwig/internal/types/task"
 	"ludwig/internal/orchestrator"
-	"ludwig/internal/types/progressBar"
+	"ludwig/internal/components/outputViewport"
 
 	"strings"
 	"time"
@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/viewport"
 )
 
 func PalleteCommands(taskStore *storage.FileTaskStorage) []Command {
@@ -150,9 +149,10 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []Command {
 				}
 				taskToView := tasks[taskIndex]
 				filePath := "./.ludwig/" + taskToView.ResponseFile
-				fileContent := utils.ReadFileAsString(filePath)
-				output := utils.OutputLines(strings.Split(fileContent, "\n"))
+				//fileContent := utils.ReadFileAsString(filePath)
+				//output := utils.OutputLines(strings.Split(fileContent, "\n"))
 
+				/*
 				m.viewport = viewport.New(utils.TermWidth() - 6, utils.TermHeight() - 6)
 				m.viewport.MouseWheelEnabled = true
 				m.viewport.MouseWheelDelta = 3
@@ -164,16 +164,12 @@ func PalleteCommands(taskStore *storage.FileTaskStorage) []Command {
 				m.viewingViewport = true
 				m.viewingTask = &taskToView
 				m.filePath = filePath
-				
-				// Initialize file change detection
-				m.fileChangeInfo, err = utils.InitFileChangeInfo(m.filePath)
-				if err != nil {
-					return "Error initializing file change detection: " + err.Error()
-				}
-				
-				m.ViewportUpdateLoop()
+				*/
+				m.viewingViewport = true
+				m.taskViewport = outputViewport.NewModel(&taskToView, filePath)
+				m.taskViewport.ViewportUpdateLoop()
 
-				return output
+				return ""
 			},
 		},
 	}

@@ -13,7 +13,6 @@ import (
 
 	"time"
 	"strings"
-	"strconv"
 )
 
 var LOADING_STYLE = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
@@ -77,7 +76,6 @@ func (m *Model) View() string {
 	insideBubble := strings.Builder{}
 	insideBubble.WriteString(m.viewport.View())
 	if spinnerOn {
-		utils.DebugLog("Rendering spinner in viewport view")
 		insideBubble.WriteString("\n" + m.spinner.View() + LOADING_STYLE.Render(" Working on it"))
 	}
 
@@ -143,7 +141,6 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 }
 
 func (m *Model) Init() tea.Cmd {
-	utils.DebugLog("Initializing viewport spinner")
 	// Always start spinner - it will only show when needed based on task status
 	m.spinner.Tick()
 	return m.spinner.Tick
@@ -175,7 +172,6 @@ func (m *Model) ViewportUpdateLoop()  {
 		}
 
 		scrollPrcnt := m.viewport.ScrollPercent()
-		utils.DebugLog(strconv.FormatFloat(scrollPrcnt, 'f', -1, 64))
 		atBottom := scrollPrcnt > 0.95
 		content := utils.OutputLines(strings.Split(fileContent, "\n"))
 		m.viewport.SetContent(content)

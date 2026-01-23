@@ -43,6 +43,13 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlW:
+			m.Width = utils.TermWidth();
+		case tea.KeyCtrlS:
+			m.Width = utils.TermWidth();
+		}
 	}
 	return m, nil
 }

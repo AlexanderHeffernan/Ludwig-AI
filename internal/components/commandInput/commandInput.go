@@ -11,7 +11,8 @@ var BORDER_STYLE = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).
 	BorderForeground(lipgloss.Color("62")).
 	Padding(0, 1).
-	Margin(1, 1)
+	Margin(1, 1).
+	MarginBottom(0)
 
 type Model struct {
 	TextInput textarea.Model
@@ -88,5 +89,5 @@ func (m *Model) View() string {
 
 	borderStyle := BORDER_STYLE.Width(inputWidth)
 
-	return borderStyle.Render(inputText)
+	return borderStyle.Render(inputText) + "\n"
 }

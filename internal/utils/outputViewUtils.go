@@ -25,14 +25,6 @@ func removeSurroundingQuotes(s string) string {
 	return s
 }
 
-/*
-func CheckFileUpdated(filePath string, lastHash []byte) (bool, []byte) {
-	newHash, fileContent := GetFileContentHash(filePath)
-
-	return bytes.Equal(newHash, lastHash), newHash
-}
-*/
-
 func GetFileContentHash(filePath string) ([]byte, string) {
 	h := sha256.New()
 	fileContent := ReadFileAsString(filePath)
@@ -267,17 +259,6 @@ func OutputLines(lines []string) string {
 	outputStr = colouredStrings(outputStr)
 	return colouredOrderedLists(outputStr)
 }
-
-/*
-func ThinkingString(m *cli.Model) string {
-	if true {
-	//if orchestrator.IsRunning() && task.Status == types.InProgress {
-		//return "thinking " + m.spinner.View() + " "
-		return ""
-	}
-	return ""
-}
-*/
 
 func GetTaskByPath(tasks []task.Task, path string) *task.Task {
 	// remove the './.ludwig/' prefix from path

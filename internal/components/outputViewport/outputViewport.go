@@ -90,6 +90,7 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 	//m.progressBar.Progress = m.viewport.ScrollPercent()
 	
+	m.progressBar.Update(msg)
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.viewport.Width = msg.Width - 14
@@ -99,9 +100,11 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyCtrlS:
 			m.viewport.ScrollDown((utils.TermHeight() - 6)/2)
+			m.progressBar.Progress = m.viewport.ScrollPercent()
 			viewportUpdated = true
 		case tea.KeyCtrlW:
 			m.viewport.ScrollUp((utils.TermHeight() - 6)/2)
+			m.progressBar.Progress = m.viewport.ScrollPercent()
 			viewportUpdated = true
 		case tea.KeyCtrlC, tea.KeyEsc:
 			//m.viewport = &viewport.Model{}
@@ -112,7 +115,6 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	case tea.MouseMsg:
 		var mouseCmd tea.Cmd
 		m.viewport, mouseCmd = m.viewport.Update(msg)
-		m.progressBar.Update(msg)
 		m.progressBar.Progress = m.viewport.ScrollPercent()
 		viewportUpdated = true
 		if mouseCmd != nil {

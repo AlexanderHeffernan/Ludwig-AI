@@ -3,6 +3,7 @@ package model
 import (
 	"ludwig/internal/components/commandInput"
 	"ludwig/internal/components/outputViewport"
+	"ludwig/internal/components/orchestratorIndicator"
 	"ludwig/internal/kanban"
 	"ludwig/internal/storage"
 	"ludwig/internal/types/task"
@@ -28,15 +29,7 @@ type Model struct {
 	message         string
 	taskViewport    outputViewport.Model
 	viewingViewport bool
-
-	/*
-		spinner   spinner.Model
-		viewport  viewport.Model
-		progressBar progressBar.Model
-		filePath  string
-		viewingTask *task.Task
-		fileChangeInfo *utils.FileChangeInfo
-	*/
+	orchestratorIndicator *orchestratorIndicator.Model
 }
 
 type Command struct {
@@ -53,13 +46,19 @@ var loadingStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
 func NewModel(taskStore *storage.FileTaskStorage, version string) *Model {
 	ti := textarea.New()
 	ti.Placeholder = "...Enter command (e.g., 'add <task>', 'exit', 'help')"
-	ti.SetWidth(utils.TermWidth() - 6) // Account for border padding
-	ti.SetHeight(2)                    // Start with minimum height
+
+	// account for border padding
+	ti.SetWidth(utils.TermWidth() - 6)
+
+	// Start with minimum height
+	ti.SetHeight(2)
 	ti.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ti.BlurredStyle.CursorLine = lipgloss.NewStyle()
 	ti.ShowLineNumbers = false
 	ti.Prompt = ""
-	ti.CharLimit = 0 // No character limit
+
+	// setting to 0 removes the character limit
+	ti.CharLimit = 0
 	ti.Focus()
 
 	tasks, err := taskStore.ListTasks()
@@ -73,6 +72,7 @@ func NewModel(taskStore *storage.FileTaskStorage, version string) *Model {
 		tasks:        utils.PointerSliceToValueSlice(tasks),
 		commandInput: commandInput.NewModel(),
 		taskViewport: outputViewport.NewModel(),
+		orchestratorIndicator: orchestratorIndicator.NewModel(),
 	}
 	m.commands = PalleteCommands(taskStore)
 
@@ -94,6 +94,7 @@ func (m *Model) checkForUpdate(version string) {
 func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.taskViewport.Init(),
+		m.orchestratorIndicator.Init(),
 		tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
 			return tickMsg(t)
 		}),
@@ -102,14 +103,25 @@ func (m *Model) Init() tea.Cmd {
 
 // Update handles incoming messages and updates the model.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+	//var cmd tea.Cmd
+	var cmds []tea.Cmd
 
-	//m.textInput, cmd = m.textInput.Update(msg)
 	if !m.viewingViewport {
-		m.commandInput.Update(msg)
+		var inputCmd tea.Cmd
+		m.commandInput, inputCmd = m.commandInput.Update(msg)
+		if inputCmd != nil {
+			cmds = append(cmds, inputCmd)
+		}
+	}
+	var indicatorCmd tea.Cmd
+	m.orchestratorIndicator, indicatorCmd = m.orchestratorIndicator.Update(msg)
+	if indicatorCmd != nil {
+		cmds = append(cmds, indicatorCmd)
 	}
 	_, viewportCmd := m.taskViewport.Update(msg)
-	// Dynamically adjust height based on content wrapping
+	if viewportCmd != nil {
+		cmds = append(cmds, viewportCmd)
+	}
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -172,6 +184,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Handle commands from viewport (like spinner ticks)
+	/*
 	if viewportCmd != nil {
 		if cmd != nil {
 			return m, tea.Batch(cmd, viewportCmd)
@@ -180,6 +193,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, cmd
+	*/
+	return m, tea.Batch(cmds...)
 }
 
 const VIEWPORT_CONTROLS = "\n(Press Ctrl+S to scroll down, Ctrl+W to scroll up, Esc to exit view)"
@@ -216,6 +231,11 @@ func (m *Model) View() string {
 	}
 
 	s.WriteString(m.commandInput.View())
+
+	//if orchestrator.IsRunning() {
+		//s.WriteString(loadingStyle.Render("\nOrchestrator is running..."))
+	//}
+	s.WriteString(m.orchestratorIndicator.View())
 
 	return s.String()
 }
